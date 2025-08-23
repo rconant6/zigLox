@@ -2,6 +2,7 @@ const std = @import("std");
 const lox = @import("lox.zig");
 const Scanner = lox.Scanner;
 const Token = lox.Token;
+const DiagnosticReporter = lox.DiagnosticReporter;
 
 const out_writer = lox.out_writer;
 const err_writer = lox.err_writer;
@@ -27,7 +28,7 @@ pub fn main() !void {
 }
 
 fn runFromPrompt(gpa: std.mem.Allocator) anyerror!void {
-    try out_writer.print("ZLox REPL - Type 'exit' to quit\n", .{});
+    try out_writer.print("ZLox REPL - Welcome! type 'exit' to quit\n", .{});
 
     while (true) {
         try out_writer.print("zlox> ", .{});
@@ -43,7 +44,7 @@ fn runFromPrompt(gpa: std.mem.Allocator) anyerror!void {
             error.ReadFailed => |e| return e,
         };
 
-        const trimmed = std.mem.trim(u8, line, " \t\r");
+        const trimmed = std.mem.trim(u8, line, " \t\r\n");
 
         if (std.mem.eql(u8, trimmed, "exit")) break;
 
@@ -77,11 +78,17 @@ fn runFromFile(gpa: std.mem.Allocator, file_name: []const u8) !void {
 }
 
 fn processData(gpa: std.mem.Allocator, data: []const u8) !void {
-    var scanner: Scanner = try .init(gpa, data);
+    var diagnostics: DiagnosticReporter = .init(gpa);
+
+    var scanner: Scanner = try .init(gpa, data, &diagnostics);
     const tokens = try scanner.scanTokens();
 
     std.log.info("Found {d} tokens", .{tokens.len});
     for (tokens) |token| {
         std.log.debug("{f}", .{token});
     }
+    if (diagnostics.hasErrors()) {
+        try diagnostics.printDiagnostics(err_writer);
+    }
+    try err_writer.flush();
 }

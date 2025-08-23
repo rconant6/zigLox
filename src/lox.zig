@@ -16,11 +16,17 @@ pub const in_reader: *std.Io.Reader = &stdin_reader.interface;
 pub const out_writer: *std.Io.Writer = &stdout_writer.interface;
 pub const err_writer: *std.Io.Writer = &stderr_writer.interface;
 
+const lerr = @import("loxError.zig");
+pub const ErrorContext = lerr.ErrorContext;
+pub const LoxError = lerr.LoxError;
+
 const tok = @import("token.zig");
 pub const Token = tok.Token;
 pub const TokenType = tok.TokenType;
 
 pub const Scanner = @import("Scanner.zig").Scanner;
+
+pub const DiagnosticReporter = @import("DiagnoticReporter.zig");
 
 pub const Location = struct {
     line: usize = 0,

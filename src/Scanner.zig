@@ -2,9 +2,12 @@ pub const Scanner = @This();
 
 const std = @import("std");
 const lox = @import("lox.zig");
+const DiagnosticsReporter = lox.DiagnosticReporter;
+const ErrorContext = lox.ErrorContext;
+const Location = lox.Location;
+const LoxError = lox.LoxError;
 const Token = lox.Token;
 const TokenType = lox.TokenType;
-const Location = lox.Location;
 
 const keywords = std.StaticStringMap(TokenType).initComptime(.{
     .{ "and", .AND },     .{ "or", .OR },         .{ "if", .IF },
@@ -19,17 +22,23 @@ const tab_width = 2;
 
 allocator: std.mem.Allocator,
 source: []const u8,
+diagnostics: *DiagnosticsReporter,
 tokens: std.ArrayList(Token),
 start: usize,
 current: usize,
 line: u32,
 column: u32,
 start_column: u32,
-pub fn init(allocator: std.mem.Allocator, source: []const u8) !Scanner {
+pub fn init(
+    allocator: std.mem.Allocator,
+    source: []const u8,
+    diagnostics: *DiagnosticsReporter,
+) !Scanner {
     return .{
         .allocator = allocator,
         .source = source,
-        .tokens = try std.ArrayList(Token).initCapacity(allocator, 128),
+        .diagnostics = diagnostics,
+        .tokens = .empty,
         .start = 0,
         .current = 0,
         .line = 1,
@@ -91,10 +100,26 @@ fn scanToken(self: *Scanner) !void {
         'a'...'z', 'A'...'Z', '_' => try self.scanIdentifier(),
 
         else => {
-            // TODO: Report error for unexpected character
-            std.log.err("Unexpected character '{}' at line {} column {}", .{ c, self.line, self.column - 1 });
+            self.diagnostics.reportError(ErrorContext.init(
+                "Unexpected character found",
+                LoxError.UnexpectedCharacter,
+            ).withLocation(.{
+                .line = self.line,
+                .col = self.start_column,
+            }));
         },
     }
+}
+
+fn addToken(self: *Scanner, token_type: TokenType) !void {
+    const text = self.source[self.start..self.current];
+    const location = Location{
+        .line = self.line,
+        .col = self.start_column,
+    };
+
+    const token = Token.init(token_type, text, location);
+    try self.tokens.append(self.allocator, token);
 }
 
 fn scanString(self: *Scanner) !void {
@@ -109,8 +134,14 @@ fn scanString(self: *Scanner) !void {
     }
 
     if (self.isAtEnd()) {
-        std.log.err("Unterminated string starting at line {} column {}", .{ start_line, start_col });
-        return error.UnterminatedString;
+        self.diagnostics.reportError(ErrorContext.init(
+            "Unterminated string found ",
+            LoxError.UnterminatedString,
+        ).withLocation(.{
+            .line = start_line,
+            .col = start_col,
+        }));
+        return LoxError.UnterminatedString;
     }
 
     _ = self.advance(); // eat the closing "
@@ -139,7 +170,6 @@ fn scanIdentifier(self: *Scanner) !void {
         _ = self.advance();
     }
 
-    // Check if it's a keyword
     const text = self.source[self.start..self.current];
     const token_type = keywords.get(text) orelse .IDENTIFIER;
 
@@ -152,6 +182,7 @@ fn skipLineComment(self: *Scanner) void {
     }
 }
 
+// MARK: Source Navigation Helpers
 fn newLine(self: *Scanner) void {
     self.line += 1;
     self.column = 1;
@@ -189,6 +220,7 @@ fn isAtEnd(self: *Scanner) bool {
     return self.current >= self.source.len;
 }
 
+// MARK: ASCII Helpers
 fn isDigit(c: u8) bool {
     return c >= '0' and c <= '9';
 }
@@ -201,15 +233,4 @@ fn isAlpha(c: u8) bool {
 
 fn isAlphaNumeric(c: u8) bool {
     return isAlpha(c) or isDigit(c);
-}
-
-fn addToken(self: *Scanner, token_type: TokenType) !void {
-    const text = self.source[self.start..self.current];
-    const location = Location{
-        .line = self.line,
-        .col = self.start_column, // Use the saved start column
-    };
-
-    const token = Token.init(token_type, text, location);
-    try self.tokens.append(self.allocator, token);
 }

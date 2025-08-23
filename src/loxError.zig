@@ -1,14 +1,14 @@
 const std = @import("std");
-const tok = @import("token.zig");
 
-const Token = tok.Token;
+const lox = @import("lox.zig");
+const Location = lox.Location;
+const Token = lox.Token;
 
-pub const Lexing = error{
+pub const LoxError = error{
+    // Scanning Errors
     UnterminatedString,
     UnexpectedCharacter,
-};
-
-pub const Parsing = error{
+    // Parsing Errors
     ExpectedToken,
     ExpectedExpression,
     ExpectedSemiColon,
@@ -20,29 +20,18 @@ pub const Parsing = error{
     ExpectedLVal,
     TooManyArguments,
     UnexpectedToken,
-};
-
-pub const Semantic = error{
+    // Semantic Errors
     UndefinedVariable,
     TypeMismatch,
     DivisionByZero,
     InvalidOperands,
     NotCallable,
     WrongNumberOfArguments,
-};
 
-pub const System = error{
-    IOError,
-    OutOfMemory,
-};
-
-pub const Lox = error{
+    // Function Types
     Return, // Used for function return propagation
     Unimplemented,
 };
-
-pub const LoxCompilerError =
-    Lexing || Parsing || Semantic || System || Lox;
 
 pub const ReturnValue = error{
     Return,
@@ -51,12 +40,11 @@ pub const ReturnValue = error{
 pub const ErrorContext = struct {
     message: []const u8,
     token: ?Token = null,
-    line: ?usize = null,
-    column: ?usize = null,
+    location: ?Location = null,
     sourceCode: ?[]const u8 = null,
-    errorType: LoxCompilerError = Lexing.UnexpectedCharacter,
+    errorType: LoxError,
 
-    pub fn init(message: []const u8, errType: LoxCompilerError) ErrorContext {
+    pub fn init(message: []const u8, errType: LoxError) ErrorContext {
         return .{
             .message = message,
             .errorType = errType,
@@ -71,10 +59,9 @@ pub const ErrorContext = struct {
         return copy;
     }
 
-    pub fn withLocation(self: ErrorContext, line: usize, column: usize) ErrorContext {
+    pub fn withLocation(self: ErrorContext, loc: Location) ErrorContext {
         var copy = self;
-        copy.line = line;
-        copy.column = column;
+        copy.location = loc;
         return copy;
     }
 
@@ -84,18 +71,13 @@ pub const ErrorContext = struct {
         return copy;
     }
 
-    pub fn format(ctx: ErrorContext, writer: anytype) !void {
-        try writer.print("Error({s}): {s}", .{ @errorName(ctx.errorType), ctx.message });
-
-        if (ctx.line != null and ctx.column != null) {
-            try writer.print(
-                " at line {d}, column {d}",
-                .{ ctx.line.?, ctx.column.? },
-            );
+    pub fn format(ctx: ErrorContext, w: *std.Io.Writer) !void {
+        try w.print("Error({t}): {s}", .{ ctx.errorType, ctx.message });
+        if (ctx.location) |loc| {
+            try w.print(" at {f}", .{loc});
         }
-
         if (ctx.token) |token| {
-            try writer.print(" near '{s}'", .{token.getLexeme()});
+            try w.print(" near '{f}'", .{token});
         }
     }
 };
