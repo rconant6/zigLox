@@ -23,8 +23,8 @@ pub const TokenType = tok.TokenType;
 pub const Scanner = @import("Scanner.zig").Scanner;
 
 pub const Location = struct {
-    line: u32 = 0,
-    col: u32 = 0,
+    line: usize = 0,
+    col: usize = 0,
 
     pub fn advance(loc: *Location) void {
         loc.col += 1;

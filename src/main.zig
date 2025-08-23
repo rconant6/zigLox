@@ -33,7 +33,7 @@ fn runFromPrompt(gpa: std.mem.Allocator) anyerror!void {
         try out_writer.print("zlox> ", .{});
         try out_writer.flush();
 
-        const line = in_reader.takeDelimiterExclusive('\n') catch |err| switch (err) {
+        const line = in_reader.takeDelimiterInclusive('\n') catch |err| switch (err) {
             error.EndOfStream => break,
             error.StreamTooLong => {
                 try err_writer.print("ERROR: Line too long\n", .{});

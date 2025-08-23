@@ -12,215 +12,204 @@ const keywords = std.StaticStringMap(TokenType).initComptime(.{
     .{ "super", .SUPER }, .{ "true", .TRUE },     .{ "false", .FALSE },
     .{ "nil", .NIL },     .{ "for", .FOR },       .{ "while", .WHILE },
     .{ "print", .PRINT }, .{ "return", .RETURN }, .{ "fun", .FUN },
-    .{ "var", .VAR },     .{ "eof", .EOF },
-});
-
-const symbols = std.StaticStringMap(TokenType).initComptime(.{
-    .{ "(", .LEFT_PAREN },     .{ ")", .RIGHT_PAREN },
-    .{ "{", .LEFT_BRACE },     .{ "}", .RIGHT_BRACE },
-    .{ "<=", .LESS_EQUAL },    .{ "<", .LESS },
-    .{ ">=", .GREATER_EQUAL }, .{ ">", .GREATER },
-    .{ "!=", .BANG_EQUAL },    .{ "!", .BANG },
-    .{ "==", .EQUAL_EQUAL },   .{ "=", .EQUAL },
-    .{ ",", .COMMA },          .{ ";", .SEMICOLON },
-    .{ ".", .DOT },            .{ "/", .SLASH },
-    .{ "+", .PLUS },           .{ "-", .MINUS },
-    .{ "*", .STAR },
+    .{ "var", .VAR },
 });
 
 const tab_width = 2;
 
 allocator: std.mem.Allocator,
-data: []const u8,
+source: []const u8,
 tokens: std.ArrayList(Token),
-file_loc: Location,
-current: u32,
-start: u32,
-end: u32,
-
-pub fn init(allocator: std.mem.Allocator, data: []const u8) !Scanner {
+start: usize,
+current: usize,
+line: u32,
+column: u32,
+start_column: u32,
+pub fn init(allocator: std.mem.Allocator, source: []const u8) !Scanner {
     return .{
         .allocator = allocator,
-        .data = data,
-        .tokens = try .initCapacity(allocator, 1028),
-        .file_loc = .{ .line = 1, .col = 1 },
-        .current = 0,
+        .source = source,
+        .tokens = try std.ArrayList(Token).initCapacity(allocator, 128),
         .start = 0,
-        .end = 0,
+        .current = 0,
+        .line = 1,
+        .column = 1,
+        .start_column = 1,
     };
 }
 
 pub fn scanTokens(self: *Scanner) ![]const Token {
     while (!self.isAtEnd()) {
-        const c = self.advance();
-
-        if (std.ascii.isWhitespace(c)) {
-            switch (c) {
-                '\n' => self.file_loc.nextLine(),
-                '\r' => self.file_loc.nextLine(),
-                '\t' => self.file_loc.advanceBy(tab_width),
-                ' ' => self.file_loc.advance(),
-                else => {},
-            }
-            continue;
-        }
-        if (c == '/') {
-            if (self.matchNext('/')) {
-                self.current += 2;
-                var nc: u8 = self.advance();
-                while (!self.isAtEnd()) : (nc = self.advance()) {
-                    if (nc == '\n') break;
-                }
-                self.file_loc.nextLine();
-                continue;
-            }
-        }
-        if (c == '"') {
-            std.log.debug("Making a string", .{});
-            self.start = self.current;
-            var nc = self.advance();
-            while (!self.isAtEnd()) : (nc = self.advance()) {
-                if (nc == '"') {
-                    self.end = self.current - 1; // skip the closing "
-                    self.addToken(.STRING);
-                    break;
-                }
-                if (nc == '\n') {
-                    self.file_loc.nextLine();
-                } else {
-                    self.file_loc.advance();
-                }
-            }
-
-            if (self.remaining() == 0) {
-                // TODO: add error for unclosed string
-                std.log.err("unclosed string ending file", .{});
-            }
-            continue;
-        }
-        if (std.ascii.isAlphabetic(c) or c == '_') {
-            self.start = self.current - 1;
-            var nc = self.advance();
-            while (!self.isAtEnd()) : (nc = self.advance()) {
-                if (!std.ascii.isAlphanumeric(nc)) break;
-                self.file_loc.advance();
-            }
-            self.end = self.current - 1;
-            const str_len = self.end - self.start;
-            const text = self.data[self.start .. self.start + str_len];
-            self.reverse();
-
-            const t_type = keywords.get(text) orelse .IDENTIFIER;
-            self.addToken(t_type);
-
-            continue;
-        }
-        if (std.ascii.isDigit(c)) {
-            self.start = self.current - 1;
-            var nc = self.advance();
-            var dot_scene = false;
-            while (!self.isAtEnd()) : (nc = self.advance()) {
-                if (!std.ascii.isDigit(nc)) {
-                    if (!dot_scene and self.floatTest()) {
-                        nc = self.advance();
-                        dot_scene = true;
-                        continue;
-                    }
-                    self.reverse();
-                    break;
-                }
-            }
-            self.end = self.current;
-            self.addToken(.NUMBER);
-            continue;
-        }
-
-        if (self.peek() == '=') { // length 2 symbols
-            self.start = self.current - 1;
-            const word: [2]u8 = .{ c, '=' };
-            if (symbols.get(&word)) |symbol| {
-                _ = self.advance(); // consume the equqal sign
-                self.end = self.current;
-                self.addToken(symbol);
-                self.file_loc.advanceBy(2);
-                continue;
-            }
-        }
-
-        if (symbols.get(&.{c})) |symbol| { // length 1 symbols
-            self.start = self.current - 1;
-            self.end = self.start + 1;
-            self.addToken(symbol);
-            self.file_loc.advance();
-            continue;
-        }
-
-        // TODO: add an unexpected character error
+        self.start = self.current;
+        try self.scanToken();
     }
 
-    self.closeOut();
+    self.start = self.current;
+    try self.addToken(.EOF);
 
-    return self.tokens.toOwnedSlice(self.allocator);
+    return try self.tokens.toOwnedSlice(self.allocator);
 }
 
-fn addToken(self: *Scanner, tok_type: TokenType) void {
-    const tok_len = self.end - self.start;
-    const token: Token = .init(
-        tok_type,
-        self.data[self.start .. self.start + tok_len],
-        self.file_loc,
-    );
-    self.tokens.append(self.allocator, token) catch |err| {
-        std.log.err(
-            "Unable to add token to scanner.tokens: Token: {any} Error: {any}\n",
-            .{ token, err },
-        );
-    };
+fn scanToken(self: *Scanner) !void {
+    const c = self.advance();
+    self.start_column = self.column - 1;
+
+    switch (c) {
+        ' ', '\r', '\t' => {},
+        '\n' => self.newLine(),
+
+        '(' => try self.addToken(.LEFT_PAREN),
+        ')' => try self.addToken(.RIGHT_PAREN),
+        '{' => try self.addToken(.LEFT_BRACE),
+        '}' => try self.addToken(.RIGHT_BRACE),
+        '[' => try self.addToken(.LEFT_BRACKET),
+        ']' => try self.addToken(.RIGHT_BRACKET),
+        ',' => try self.addToken(.COMMA),
+        '.' => try self.addToken(.DOT),
+        '-' => try self.addToken(.MINUS),
+        '+' => try self.addToken(.PLUS),
+        ';' => try self.addToken(.SEMICOLON),
+        '*' => try self.addToken(.STAR),
+
+        '!' => try self.addToken(if (self.match('=')) .BANG_EQUAL else .BANG),
+        '=' => try self.addToken(if (self.match('=')) .EQUAL_EQUAL else .EQUAL),
+        '<' => try self.addToken(if (self.match('=')) .LESS_EQUAL else .LESS),
+        '>' => try self.addToken(if (self.match('=')) .GREATER_EQUAL else .GREATER),
+
+        '/' => {
+            if (self.match('/')) {
+                self.skipLineComment();
+            } else {
+                try self.addToken(.SLASH);
+            }
+        },
+
+        '"' => try self.scanString(),
+
+        '0'...'9' => try self.scanNumber(),
+
+        'a'...'z', 'A'...'Z', '_' => try self.scanIdentifier(),
+
+        else => {
+            // TODO: Report error for unexpected character
+            std.log.err("Unexpected character '{}' at line {} column {}", .{ c, self.line, self.column - 1 });
+        },
+    }
 }
 
-fn matchNext(self: *Scanner, c: u8) bool {
-    if (self.current >= self.data.len) return false;
-    return c == self.peek();
+fn scanString(self: *Scanner) !void {
+    const start_line = self.line;
+    const start_col = self.column;
+
+    while (!self.isAtEnd() and self.peek() != '"') {
+        if (self.peek() == '\n') {
+            self.newLine();
+        }
+        _ = self.advance();
+    }
+
+    if (self.isAtEnd()) {
+        std.log.err("Unterminated string starting at line {} column {}", .{ start_line, start_col });
+        return error.UnterminatedString;
+    }
+
+    _ = self.advance(); // eat the closing "
+
+    try self.addToken(.STRING);
 }
 
-fn floatTest(self: *Scanner) bool {
-    if (self.current + 2 >= self.data.len) return false;
-    const next = self.data[self.current - 1];
-    const next_is_dot = next == '.';
-    const isNum = std.ascii.isDigit(self.peek());
+fn scanNumber(self: *Scanner) !void {
+    while (isDigit(self.peek())) {
+        _ = self.advance();
+    }
 
-    std.log.debug("Next: {c} NextIsDot: {} Peek: {c} isNum: {}", .{ next, next_is_dot, self.peek(), isNum });
-    return (next_is_dot and isNum);
+    if (self.peek() == '.' and isDigit(self.peekNext())) {
+        _ = self.advance();
+
+        while (isDigit(self.peek())) {
+            _ = self.advance();
+        }
+    }
+
+    try self.addToken(.NUMBER);
 }
 
-fn peek(self: *Scanner) u8 {
-    return self.data[self.current];
+fn scanIdentifier(self: *Scanner) !void {
+    while (isAlphaNumeric(self.peek())) {
+        _ = self.advance();
+    }
+
+    // Check if it's a keyword
+    const text = self.source[self.start..self.current];
+    const token_type = keywords.get(text) orelse .IDENTIFIER;
+
+    try self.addToken(token_type);
+}
+
+fn skipLineComment(self: *Scanner) void {
+    while (!self.isAtEnd() and self.peek() != '\n') {
+        _ = self.advance();
+    }
+}
+
+fn newLine(self: *Scanner) void {
+    self.line += 1;
+    self.column = 1;
 }
 
 fn advance(self: *Scanner) u8 {
-    const result = self.data[self.current];
+    if (self.isAtEnd()) return 0;
+
+    const c = self.source[self.current];
     self.current += 1;
-    return result;
-}
-fn advancedBy(self: *Scanner, offset: u32) u8 {
-    std.debug.assert(self.data.len > self.current + 2);
-    self.current += offset;
-    return self.data[self.current - 1];
-}
-fn reverse(self: *Scanner) void {
-    self.current -= 1;
+    self.column += 1;
+    return c;
 }
 
-fn remaining(self: *Scanner) u64 {
-    return self.data.len - self.current;
+fn match(self: *Scanner, expected: u8) bool {
+    if (self.isAtEnd()) return false;
+    if (self.source[self.current] != expected) return false;
+
+    self.current += 1;
+    self.column += 1;
+    return true;
+}
+
+fn peek(self: *Scanner) u8 {
+    if (self.isAtEnd()) return 0;
+    return self.source[self.current];
+}
+
+fn peekNext(self: *Scanner) u8 {
+    if (self.current + 1 >= self.source.len) return 0;
+    return self.source[self.current + 1];
 }
 
 fn isAtEnd(self: *Scanner) bool {
-    return self.current >= self.data.len;
+    return self.current >= self.source.len;
 }
 
-fn closeOut(self: *Scanner) void {
-    self.start = self.current;
-    self.end = self.start;
-    self.addToken(.EOF);
+fn isDigit(c: u8) bool {
+    return c >= '0' and c <= '9';
+}
+
+fn isAlpha(c: u8) bool {
+    return (c >= 'a' and c <= 'z') or
+        (c >= 'A' and c <= 'Z') or
+        c == '_';
+}
+
+fn isAlphaNumeric(c: u8) bool {
+    return isAlpha(c) or isDigit(c);
+}
+
+fn addToken(self: *Scanner, token_type: TokenType) !void {
+    const text = self.source[self.start..self.current];
+    const location = Location{
+        .line = self.line,
+        .col = self.start_column, // Use the saved start column
+    };
+
+    const token = Token.init(token_type, text, location);
+    try self.tokens.append(self.allocator, token);
 }
