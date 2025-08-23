@@ -129,8 +129,8 @@ fn primary(self: *Parser) LoxError!*Expr {
             return node;
         },
         else => {
-            const etoken = self.previous() orelse self.source[self.current];
-            self.parseError(LoxError.ExpectedExpression, "Expected expression", etoken);
+            const err_token = self.previous() orelse self.source[self.current];
+            self.parseError(LoxError.ExpectedExpression, "Expected expression", err_token);
             return LoxError.ExpectedExpression;
         },
     }
@@ -251,5 +251,4 @@ fn expect(self: *Parser, t_type: TokenType, message: []const u8) !Token {
         return token;
     const token = self.peek() orelse self.source[self.current - 1];
     self.parseError(LoxError.ExpectedToken, message, token);
-    return LoxError.ExpectedToken;
 }

@@ -35,6 +35,10 @@ pub fn hasErrors(self: DiagnosticReporter) bool {
     return self.errors.items.len > 0;
 }
 
+pub fn clearErrors(self: DiagnosticReporter) void {
+    @constCast(&self).errors.clearRetainingCapacity();
+}
+
 pub fn printDiagnostics(self: DiagnosticReporter, w: *std.Io.Writer) !void {
     for (self.errors.items) |ctx| {
         try w.print("{f}", .{ctx});

@@ -1,37 +1,19 @@
 const std = @import("std");
-
-const stdin = std.fs.File.stdin();
-const stdout = std.fs.File.stdout();
-const stderr = std.fs.File.stderr();
-
-var stdin_buffer: [1024]u8 = undefined;
-var stdout_buffer: [4096]u8 = undefined;
-var stderr_buffer: [1024]u8 = undefined;
-
-var stdin_reader = stdin.reader(&stdin_buffer);
-var stdout_writer = stdout.writer(&stdout_buffer);
-var stderr_writer = stderr.writer(&stderr_buffer);
-
-pub const in_reader: *std.Io.Reader = &stdin_reader.interface;
-pub const out_writer: *std.Io.Writer = &stdout_writer.interface;
-pub const err_writer: *std.Io.Writer = &stderr_writer.interface;
-
+const exp = @import("expression.zig");
+const intp = @import("interpreter.zig");
 const lerr = @import("loxError.zig");
-pub const ErrorContext = lerr.ErrorContext;
-pub const LoxError = lerr.LoxError;
-
 const tok = @import("token.zig");
+pub const DiagnosticReporter = @import("DiagnoticReporter.zig");
+pub const ErrorContext = lerr.ErrorContext;
+pub const Expr = exp.Expr;
+pub const ExprValue = exp.ExprValue;
+pub const Interpreter = intp.Interpreter;
+pub const LoxError = lerr.LoxError;
+pub const Parser = @import("Parser.zig");
+pub const RuntimeValue = intp.RuntimeValue;
+pub const Scanner = @import("Scanner.zig");
 pub const Token = tok.Token;
 pub const TokenType = tok.TokenType;
-
-const exp = @import("expression.zig");
-pub const ExprValue = exp.ExprValue;
-pub const Expr = exp.Expr;
-
-pub const Parser = @import("Parser.zig");
-pub const Scanner = @import("Scanner.zig");
-
-pub const DiagnosticReporter = @import("DiagnoticReporter.zig");
 
 pub const Location = struct {
     line: usize = 0,
@@ -69,3 +51,16 @@ pub const LiteralValue = union(enum) {
     bool: bool,
     void: void,
 };
+
+const stdin = std.fs.File.stdin();
+const stdout = std.fs.File.stdout();
+const stderr = std.fs.File.stderr();
+var stdin_buffer: [1024]u8 = undefined;
+var stdout_buffer: [4096]u8 = undefined;
+var stderr_buffer: [1024]u8 = undefined;
+var stdin_reader = stdin.reader(&stdin_buffer);
+var stdout_writer = stdout.writer(&stdout_buffer);
+var stderr_writer = stderr.writer(&stderr_buffer);
+pub const in_reader: *std.Io.Reader = &stdin_reader.interface;
+pub const out_writer: *std.Io.Writer = &stdout_writer.interface;
+pub const err_writer: *std.Io.Writer = &stderr_writer.interface;

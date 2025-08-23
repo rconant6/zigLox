@@ -6,26 +6,27 @@ const Token = lox.Token;
 
 pub const LoxError = error{
     // Scanning Errors
-    UnterminatedString,
     UnexpectedCharacter,
+    UnterminatedString,
     // Parsing Errors
-    ExpectedToken,
-    ExpectedExpression,
-    ExpectedSemiColon,
-    ExpectedClosingParen,
-    ExpectedOpeningParen,
-    ExpectedClosingBrace,
-    ExpectedIdentifier,
     ExpectedBlockStatement,
+    ExpectedClosingBrace,
+    ExpectedClosingParen,
+    ExpectedExpression,
+    ExpectedIdentifier,
     ExpectedLVal,
+    ExpectedOpeningParen,
+    ExpectedSemiColon,
+    ExpectedToken,
     TooManyArguments,
     UnexpectedToken,
     // Semantic Errors
-    UndefinedVariable,
-    TypeMismatch,
     DivisionByZero,
+    InvalidBinaryOperand,
     InvalidOperands,
     NotCallable,
+    TypeMismatch,
+    UndefinedVariable,
     WrongNumberOfArguments,
     // System Errors
     OutOfMemory,

@@ -1,6 +1,7 @@
 const std = @import("std");
 const lox = @import("lox.zig");
 const DiagnosticReporter = lox.DiagnosticReporter;
+const Interpreter = lox.Interpreter;
 const Parser = lox.Parser;
 const Scanner = lox.Scanner;
 const Token = lox.Token;
@@ -8,6 +9,9 @@ const Token = lox.Token;
 const out_writer = lox.out_writer;
 const err_writer = lox.err_writer;
 const in_reader = lox.in_reader;
+
+const lex_parse_err = 65;
+const runtime_err = 70;
 
 pub fn main() !void {
     const allocator = std.heap.page_allocator;
@@ -49,7 +53,7 @@ fn runFromPrompt(gpa: std.mem.Allocator) anyerror!void {
 
         if (std.mem.eql(u8, trimmed, "exit")) break;
 
-        processData(gpa, trimmed) catch |err| {
+        _ = processData(gpa, trimmed) catch |err| {
             try err_writer.print("ERROR: {any}\n", .{err});
             try err_writer.flush();
         };
@@ -75,10 +79,12 @@ fn runFromFile(gpa: std.mem.Allocator, file_name: []const u8) !void {
 
     const bytes = try file.readAll(data);
     std.debug.assert(bytes == stats.size);
-    try processData(gpa, data);
+
+    const return_val = try processData(gpa, data);
+    std.process.exit(return_val);
 }
 
-fn processData(gpa: std.mem.Allocator, data: []const u8) !void {
+fn processData(gpa: std.mem.Allocator, data: []const u8) !u8 {
     var diagnostics: DiagnosticReporter = .init(gpa);
 
     var scanner: Scanner = try .init(gpa, data, &diagnostics);
@@ -88,22 +94,39 @@ fn processData(gpa: std.mem.Allocator, data: []const u8) !void {
             try diagnostics.printDiagnostics(err_writer);
             try err_writer.flush();
         }
-        std.process.exit(65);
+        return lex_parse_err;
     };
 
+    if (tokens.len <= 1) return 0;
+
+    diagnostics.clearErrors();
     std.log.info("Lexing Complete with {d} tokens", .{tokens.len});
     // for (tokens) |token| {
     //     std.log.debug("{f}", .{token});
     // }
 
     var parser: Parser = .init(gpa, tokens[0..], &diagnostics);
-    const result = try parser.parse();
+    const result = parser.parse() catch {
+        std.log.err("Parsing Complete with Error(s)", .{});
+        if (diagnostics.hasErrors()) {
+            try diagnostics.printDiagnostics(err_writer);
+            try err_writer.flush();
+        }
+        return lex_parse_err;
+    };
 
     std.log.info("Parsing complete", .{});
+    diagnostics.clearErrors();
+    std.log.debug("{f}", .{result});
+
+    var interpreter: Interpreter = .init(gpa, &diagnostics);
+    const return_val = try interpreter.evalExpr(result);
     if (diagnostics.hasErrors()) {
         try diagnostics.printDiagnostics(err_writer);
         try err_writer.flush();
+        return runtime_err;
     }
+    std.log.debug("Return Value: {f}", .{return_val});
 
-    std.log.debug("{f}", .{result});
+    return 0;
 }
