@@ -127,6 +127,8 @@ fn scanString(self: *Scanner) !void {
     const start_line = self.line;
     const start_col = self.column;
 
+    self.start = self.current; // skip "
+
     while (!self.isAtEnd() and self.peek() != '"') {
         if (self.peek() == '\n') {
             self.newLine();
@@ -136,7 +138,7 @@ fn scanString(self: *Scanner) !void {
 
     if (self.isAtEnd()) {
         self.diagnostics.reportError(ErrorContext.init(
-            "Unterminated string found ",
+            "Unterminated string found",
             LoxError.UnterminatedString,
         ).withLocation(.{
             .line = start_line,
@@ -145,9 +147,9 @@ fn scanString(self: *Scanner) !void {
         return LoxError.UnterminatedString;
     }
 
-    _ = self.advance(); // eat the closing "
-
     try self.addToken(.STRING);
+
+    _ = self.advance(); // skip "
 }
 
 fn scanNumber(self: *Scanner) !void {
