@@ -1,8 +1,9 @@
 const std = @import("std");
 const lox = @import("lox.zig");
+const DiagnosticReporter = lox.DiagnosticReporter;
+const Parser = lox.Parser;
 const Scanner = lox.Scanner;
 const Token = lox.Token;
-const DiagnosticReporter = lox.DiagnosticReporter;
 
 const out_writer = lox.out_writer;
 const err_writer = lox.err_writer;
@@ -81,14 +82,28 @@ fn processData(gpa: std.mem.Allocator, data: []const u8) !void {
     var diagnostics: DiagnosticReporter = .init(gpa);
 
     var scanner: Scanner = try .init(gpa, data, &diagnostics);
-    const tokens = try scanner.scanTokens();
+    const tokens = scanner.scanTokens() catch {
+        std.log.err("Lexing Complete with Error(s)", .{});
+        if (diagnostics.hasErrors()) {
+            try diagnostics.printDiagnostics(err_writer);
+            try err_writer.flush();
+        }
+        std.process.exit(65);
+    };
 
-    std.log.info("Found {d} tokens", .{tokens.len});
-    for (tokens) |token| {
-        std.log.debug("{f}", .{token});
-    }
+    std.log.info("Lexing Complete with {d} tokens", .{tokens.len});
+    // for (tokens) |token| {
+    //     std.log.debug("{f}", .{token});
+    // }
+
+    var parser: Parser = .init(gpa, tokens[0..], &diagnostics);
+    const result = try parser.parse();
+
+    std.log.info("Parsing complete", .{});
     if (diagnostics.hasErrors()) {
         try diagnostics.printDiagnostics(err_writer);
+        try err_writer.flush();
     }
-    try err_writer.flush();
+
+    std.log.debug("{f}", .{result});
 }

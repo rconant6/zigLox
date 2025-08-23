@@ -27,6 +27,8 @@ pub const LoxError = error{
     InvalidOperands,
     NotCallable,
     WrongNumberOfArguments,
+    // System Errors
+    OutOfMemory,
 
     // Function Types
     Return, // Used for function return propagation
@@ -54,8 +56,7 @@ pub const ErrorContext = struct {
     pub fn withToken(self: ErrorContext, token: Token) ErrorContext {
         var copy = self;
         copy.token = token;
-        copy.line = token.loc.line;
-        copy.column = token.loc.col;
+        copy.location = token.loc;
         return copy;
     }
 
@@ -71,7 +72,7 @@ pub const ErrorContext = struct {
         return copy;
     }
 
-    pub fn format(ctx: ErrorContext, w: *std.Io.Writer) !void {
+    pub fn format(ctx: ErrorContext, w: *std.Io.Writer) std.Io.Writer.Error!void {
         try w.print("Error({t}): {s}", .{ ctx.errorType, ctx.message });
         if (ctx.location) |loc| {
             try w.print(" at {f}", .{loc});

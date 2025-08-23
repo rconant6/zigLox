@@ -107,6 +107,7 @@ fn scanToken(self: *Scanner) !void {
                 .line = self.line,
                 .col = self.start_column,
             }));
+            return LoxError.UnexpectedCharacter;
         },
     }
 }

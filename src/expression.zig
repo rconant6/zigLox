@@ -22,9 +22,9 @@ pub const ExprValue = union(enum) {
 
     pub fn format(val: ExprValue, w: *std.Io.Writer) !void {
         switch (val) {
-            .String => |s| w.print("{s}", .{s}),
-            .Number => |n| w.print("{d}", .{n}),
-            .Bool => |b| w.print("{}", .{b}),
+            .String => |s| try w.print("{s}", .{s}),
+            .Number => |n| try w.print("{d}", .{n}),
+            .Bool => |b| try w.print("{}", .{b}),
         }
     }
 };
@@ -50,18 +50,18 @@ pub const Expr = union(enum) {
         switch (expr) {
             .Binary => |b| {
                 try w.print(
-                    "BinaryExpr:\n  left {f} {s} right {f}",
+                    "BinaryExpr: {f} {s} {f}",
                     .{ b.left, b.op.lexeme, b.right },
                 );
             },
             .Group => |g| {
-                try w.print("Grouping:\n  ({f})", .{g.expr});
+                try w.print("Grouping: ({f})", .{g.expr});
             },
             .Literal => |l| {
-                try w.print("Literal:\n  {f}", .{l.value});
+                try w.print("{f}", .{l.value});
             },
             .Unary => |u| {
-                try w.print("Unary:\n  {s} {f}", .{ u.op.lexeme, u.expr });
+                try w.print("Unary: {s} {f}", .{ u.op.lexeme, u.expr });
             },
         }
     }

@@ -28,7 +28,8 @@ const exp = @import("expression.zig");
 pub const ExprValue = exp.ExprValue;
 pub const Expr = exp.Expr;
 
-pub const Scanner = @import("Scanner.zig").Scanner;
+pub const Parser = @import("Parser.zig");
+pub const Scanner = @import("Scanner.zig");
 
 pub const DiagnosticReporter = @import("DiagnoticReporter.zig");
 
@@ -54,7 +55,7 @@ pub const Location = struct {
         return .{ .line = loc.line, .col = loc.col + dist };
     }
 
-    pub fn format(loc: Location, w: *std.Io.Writer) !void {
+    pub fn format(loc: Location, w: *std.Io.Writer) std.Io.Writer.Error!void {
         return w.print(
             "Location: [line:{d:4} col:{d:4}]",
             .{ loc.line, loc.col },

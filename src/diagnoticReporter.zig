@@ -37,6 +37,6 @@ pub fn hasErrors(self: DiagnosticReporter) bool {
 
 pub fn printDiagnostics(self: DiagnosticReporter, w: *std.Io.Writer) !void {
     for (self.errors.items) |ctx| {
-        try w.print("{f}\n", .{ctx});
+        try w.print("{f}", .{ctx});
     }
 }
