@@ -1,0 +1,74 @@
+GRAMMAR
+
+program        → declaration* EOF ;
+
+STATEMENTS
+declaration    → funDecl
+               | varDecl
+               | statement ;
+
+statement      → expStmt
+               | ifStmt
+               | printStmt
+               | returnStmt
+               | forStmt
+               | whileStmt
+               | block ;
+
+returnStmt     → "return" expression? ";" ;
+
+forStmt        → "for" "(" ( varDecl | exprStmt | ";" )
+                 expression? ";"
+                 expression? ")" statement ;whileStmt      → "while" "(" expression ")" statement  ;
+
+ifStmt         → "if" "(" expression ")" statement
+               ( "else" statement )? ;
+
+block          → "{" declaration* "}" ;
+
+funDecl        → "fun" function ;
+function       → IDENTIFIER "(" parameters? ")" block ;
+parameters     → IDENTIFIER ( "," IDENTIFIER )* ;
+
+varDecl        → "var" IDENTIFIER ( "=" expression )? ";" ;
+
+exprStmt       → expression ";" ;
+
+printStmt      → "print" expression ";" ;
+
+
+EXPRESSIONS
+arguments      → expression ("," expression)* ;
+
+expression     → assignment ;
+
+assignment     → IDENTIFIER "=" assignment
+               | logic_or ;
+
+logic_or       → logic_and ( "or" logic_and )* ;
+
+logic_and      → equality ( "and" equality )* ;
+
+equality       → comparison ( ( "!=" | "==" ) comparison )* ;
+
+comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
+
+term           → factor ( ( "-" | "+" ) factor )* ;
+
+factor         → unary ( ( "/" | "*" ) unary )* ;
+
+unary          → ( "!" | "-" ) unary | call ;
+
+call           → primary ( "(" arguments? ")" )* ;
+
+primary        → NUMBER | STRING | "true" | "false" | "nil"
+               | "(" expression ")" 
+               | IDENTIFIER ;
+
+PRECEDENCE & ASSOCIATIVITY
+Equality	== !=	    Left
+Comparison	> >= < <=   Left
+Term	        - +	    Left
+Factor	/ *	    Left
+Unary	        ! -	    Right
+
