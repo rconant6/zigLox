@@ -24,6 +24,10 @@ const tok = @import("token.zig");
 pub const Token = tok.Token;
 pub const TokenType = tok.TokenType;
 
+const exp = @import("expression.zig");
+pub const ExprValue = exp.ExprValue;
+pub const Expr = exp.Expr;
+
 pub const Scanner = @import("Scanner.zig").Scanner;
 
 pub const DiagnosticReporter = @import("DiagnoticReporter.zig");
