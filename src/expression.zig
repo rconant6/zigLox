@@ -33,6 +33,9 @@ pub const Expr = union(enum) {
         op: Token,
         expr: *Expr,
     }),
+    Variable: ParseType(struct {
+        name: Token,
+    }),
 
     pub fn format(expr: Expr, w: *std.Io.Writer) !void {
         switch (expr) {
@@ -50,6 +53,9 @@ pub const Expr = union(enum) {
             },
             .Unary => |u| {
                 try w.print("Unary: {s} {f}", .{ u.op.lexeme, u.expr });
+            },
+            .Variable => |v| {
+                try w.print("Variable: {s}", .{v.name.value.String});
             },
         }
     }

@@ -11,6 +11,10 @@ pub const Stmt = union(enum) {
     Print: ParseType(struct {
         value: *Expr,
     }),
+    Variable: ParseType(struct {
+        name: Token,
+        value: ?*Expr,
+    }),
 
     pub fn format(stmt: Stmt, w: *std.Io.Writer) std.Io.Writer.Error!void {
         switch (stmt) {
@@ -19,6 +23,9 @@ pub const Stmt = union(enum) {
             },
             .Print => |p| {
                 try w.print("PrintStmt: {f}", .{p.value});
+            },
+            .Variable => |v| {
+                try w.print("Variable: {s} = {}", .{ v.name.lexeme, v.value });
             },
         }
     }

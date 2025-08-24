@@ -39,19 +39,68 @@ pub fn parse(self: *Parser, tokens: []const Token) LoxError![]const Stmt {
     while (self.peek()) |token| {
         if (token.type == .EOF) break;
 
-        const stmt = try self.statement();
-        if (stmt) |s| {
-            try statements.append(self.allocator, s.*);
-        }
+        const stmt = self.declaration() catch |e| {
+            if (e == LoxError.ExpectedSemiColon) {
+                self.synchronize();
+                continue;
+            }
+            return e;
+        };
+
+        // if (stmt) |s| {
+        try statements.append(self.allocator, stmt.*);
+        // }
     }
 
     return statements.toOwnedSlice(self.allocator);
 }
 
-fn statement(self: *Parser) LoxError!?*Stmt {
+fn declaration(self: *Parser) LoxError!*Stmt {
+    return try self.varStatement();
+}
+
+fn varStatement(self: *Parser) LoxError!*Stmt {
+    if (self.match(&.{.VAR})) |_| {
+        if (self.match(&.{.IDENTIFIER})) |id| {
+            return try self.varDecl(id);
+        } else {
+            const err_token = self.previous() orelse self.source[self.current];
+            self.parseError(
+                LoxError.ExpectedIdentifier,
+                "Expected variable name after 'var'",
+                err_token,
+            );
+            return LoxError.ExpectedIdentifier;
+        }
+    }
+    return try self.statement();
+}
+
+fn varDecl(self: *Parser, id: Token) LoxError!*Stmt {
+    var expr: ?*Expr = null;
+
+    if (self.match(&.{.EQUAL})) |_| {
+        expr = try self.expression();
+    }
+
+    if (self.match(&.{.SEMICOLON})) |_| {} else {
+        const err_token = self.previous() orelse self.source[self.current];
+        self.parseError(LoxError.ExpectedSemiColon, "Expected ';' after variable declaration", err_token);
+        return LoxError.ExpectedSemiColon;
+    }
+
+    const node = try self.allocator.create(Stmt);
+    errdefer self.allocator.destroy(node);
+    node.* = .{ .Variable = .{ .name = id, .value = expr } };
+    return node;
+}
+
+fn statement(self: *Parser) LoxError!*Stmt {
     if (self.match(&.{.PRINT})) |_| {
         return self.printStatement();
-    } else return self.exprStatement();
+    }
+
+    return self.exprStatement();
 }
 
 fn exprStatement(self: *Parser) LoxError!*Stmt {
@@ -182,12 +231,16 @@ fn primary(self: *Parser) LoxError!*Expr {
             node.* = .{ .Group = .{ .expr = expr } };
             return node;
         },
+        .IDENTIFIER => {},
         else => {
             const err_token = self.previous() orelse self.source[self.current];
             self.parseError(LoxError.ExpectedExpression, "Expected expression", err_token);
             return LoxError.ExpectedExpression;
         },
     }
+
+    self.parseError(LoxError.ExpectedExpression, "Expected expression", self.source[self.current]);
+    return LoxError.ExpectedExpression;
 }
 
 // MARK: Parsing Creators
@@ -250,7 +303,7 @@ fn freeExpr(self: *Parser, expr: *Expr) void {
             self.freeExpr(g.expr);
             self.allocator.destroy(g.expr);
         },
-        .Literal => {},
+        .Literal, .Variable => {},
         .Unary => |u| {
             self.freeExpr(u.expr);
             self.allocator.destroy(u.expr);

@@ -67,6 +67,7 @@ pub const Interpreter = struct {
                 try out_writer.print("{f}\n", .{value});
                 try out_writer.flush();
             },
+            .Variable => {},
         }
     }
 
@@ -103,6 +104,7 @@ pub const Interpreter = struct {
                     else => return .{ .Nil = {} },
                 }
             },
+            .Variable => |_| return .{ .Nil = {} },
         }
     }
 
