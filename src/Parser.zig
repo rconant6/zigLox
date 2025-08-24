@@ -9,9 +9,10 @@ const ExprValue = lox.ExprValue;
 const LoxError = lox.LoxError;
 const Token = lox.Token;
 const TokenType = lox.TokenType;
+const Stmt = lox.Stmt;
 
 allocator: std.mem.Allocator,
-source: []const Token,
+source: []const Token = undefined,
 expressions: std.ArrayList(Expr),
 diagnostics: *DiagnosticsReporter,
 current: usize,
@@ -19,12 +20,10 @@ panic_mode: bool,
 
 pub fn init(
     gpa: std.mem.Allocator,
-    tokens: []const Token,
     diagnostic: *DiagnosticsReporter,
 ) Parser {
     return .{
         .allocator = gpa,
-        .source = tokens,
         .expressions = .empty,
         .diagnostics = diagnostic,
         .current = 0,
@@ -32,8 +31,63 @@ pub fn init(
     };
 }
 
-pub fn parse(self: *Parser) LoxError!*Expr {
-    return self.expression();
+pub fn parse(self: *Parser, tokens: []const Token) LoxError![]const Stmt {
+    var statements: std.ArrayList(Stmt) = .empty;
+    self.source = tokens;
+    self.panic_mode = false;
+
+    while (self.peek()) |token| {
+        if (token.type == .EOF) break;
+
+        const stmt = try self.statement();
+        if (stmt) |s| {
+            try statements.append(self.allocator, s.*);
+        }
+    }
+
+    return statements.toOwnedSlice(self.allocator);
+}
+
+fn statement(self: *Parser) LoxError!?*Stmt {
+    if (self.match(&.{.PRINT})) |_| {
+        return self.printStatement();
+    } else return self.exprStatement();
+}
+
+fn exprStatement(self: *Parser) LoxError!*Stmt {
+    const expr = try self.expression();
+
+    if (self.match(&.{.SEMICOLON})) |_| {} else {
+        const token = self.previous() orelse self.source[self.current];
+        self.parseError(
+            LoxError.ExpectedSemiColon,
+            "Expected ';' to end an expression statement",
+            token,
+        );
+        return LoxError.ExpectedSemiColon;
+    }
+
+    const node = try self.allocator.create(Stmt);
+    errdefer self.allocator.destroy(node);
+    node.* = .{ .Expression = .{ .value = expr } };
+
+    return node;
+}
+
+fn printStatement(self: *Parser) LoxError!*Stmt {
+    const expr = try self.expression();
+
+    if (self.match(&.{.SEMICOLON})) |_| {} else {
+        const token = self.previous() orelse self.source[self.current];
+        self.parseError(LoxError.ExpectedSemiColon, "Expected ';' to end an print statement", token);
+        return LoxError.ExpectedSemiColon;
+    }
+
+    const node = try self.allocator.create(Stmt);
+    errdefer self.allocator.destroy(node);
+    node.* = .{ .Print = .{ .value = expr } };
+
+    return node;
 }
 
 fn expression(self: *Parser) LoxError!*Expr {

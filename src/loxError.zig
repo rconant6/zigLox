@@ -30,7 +30,7 @@ pub const LoxError = error{
     WrongNumberOfArguments,
     // System Errors
     OutOfMemory,
-
+    WriteFailed,
     // Function Types
     Return, // Used for function return propagation
     Unimplemented,

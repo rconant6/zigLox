@@ -1,8 +1,11 @@
 const std = @import("std");
 const lox = @import("lox.zig");
+const out_writer = lox.out_writer;
 const DiagnosticReporter = lox.DiagnosticReporter;
+const ErrorContext = lox.ErrorContext;
 const Expr = lox.Expr;
 const LoxError = lox.LoxError;
+const Stmt = lox.Stmt;
 const Token = lox.Token;
 
 pub const RuntimeValue = union(enum) {
@@ -50,6 +53,23 @@ pub const Interpreter = struct {
         };
     }
 
+    pub fn interpret(self: *Interpreter, program: []const Stmt) !void {
+        for (program) |stmt| {
+            try self.execute(stmt);
+        }
+    }
+
+    fn execute(self: *Interpreter, stmt: Stmt) LoxError!void {
+        switch (stmt) {
+            .Expression => |e| _ = try self.evalExpr(e.value),
+            .Print => |p| {
+                const value = try self.evalExpr(p.value);
+                try out_writer.print("{f}\n", .{value});
+                try out_writer.flush();
+            },
+        }
+    }
+
     pub fn evalExpr(self: *Interpreter, expr: *Expr) LoxError!RuntimeValue {
         switch (expr.*) {
             .Binary => |b| {
@@ -71,8 +91,11 @@ pub const Interpreter = struct {
                     .MINUS => {
                         const right_tag = std.meta.activeTag(right);
                         if (right_tag != .Number) {
-                            // TODO: error stuff here
-                            std.log.debug("yup can't minus a non-number", .{});
+                            self.processRuntimeError(
+                                LoxError.TypeMismatch,
+                                "Unary (-) operation requires a number on the right hand side",
+                                u.op,
+                            );
                             return LoxError.TypeMismatch;
                         }
                         return .{ .Number = -right.Number };
@@ -107,7 +130,14 @@ pub const Interpreter = struct {
                         .{ left.String, right.String },
                     ) },
                     .Number => return .{ .Number = left.Number + right.Number },
-                    else => return LoxError.InvalidOperands, // TODO: real error handle
+                    else => {
+                        self.processRuntimeError(
+                            LoxError.InvalidOperands,
+                            "Invalid Binary expression Operand {s}",
+                            op,
+                        );
+                        return LoxError.InvalidBinaryOperand; // TODO: real error handle
+                    },
                 }
             },
             .MINUS, .SLASH, .STAR, .GREATER, .GREATER_EQUAL, .LESS, .LESS_EQUAL => |sym| {
@@ -127,5 +157,17 @@ pub const Interpreter = struct {
             },
             else => return LoxError.InvalidBinaryOperand,
         }
+    }
+
+    fn processRuntimeError(
+        self: *Interpreter,
+        err: LoxError,
+        message: []const u8,
+        token: Token,
+    ) void {
+        self.diagnostics.reportError(
+            ErrorContext.init(message, err)
+                .withToken(token),
+        );
     }
 };

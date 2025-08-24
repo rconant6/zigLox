@@ -1,19 +1,7 @@
 const std = @import("std");
 const lox = @import("lox.zig");
+const ParseType = lox.ParseType;
 const Token = lox.Token;
-
-fn ExprType(comptime fields: type) type {
-    const fields_info = @typeInfo(fields).@"struct".fields;
-
-    return @Type(.{
-        .@"struct" = .{
-            .layout = .auto,
-            .fields = fields_info,
-            .decls = &.{},
-            .is_tuple = false,
-        },
-    });
-}
 
 pub const ExprValue = union(enum) {
     String: []const u8,
@@ -30,18 +18,18 @@ pub const ExprValue = union(enum) {
 };
 
 pub const Expr = union(enum) {
-    Binary: ExprType(struct {
+    Binary: ParseType(struct {
         left: *Expr,
         op: Token,
         right: *Expr,
     }),
-    Group: ExprType(struct {
+    Group: ParseType(struct {
         expr: *Expr,
     }),
-    Literal: ExprType(struct {
+    Literal: ParseType(struct {
         value: ExprValue,
     }),
-    Unary: ExprType(struct {
+    Unary: ParseType(struct {
         op: Token,
         expr: *Expr,
     }),

@@ -3,6 +3,7 @@ const exp = @import("expression.zig");
 const intp = @import("interpreter.zig");
 const lerr = @import("loxError.zig");
 const tok = @import("token.zig");
+const stmt = @import("statement.zig");
 pub const DiagnosticReporter = @import("DiagnoticReporter.zig");
 pub const ErrorContext = lerr.ErrorContext;
 pub const Expr = exp.Expr;
@@ -12,8 +13,22 @@ pub const LoxError = lerr.LoxError;
 pub const Parser = @import("Parser.zig");
 pub const RuntimeValue = intp.RuntimeValue;
 pub const Scanner = @import("Scanner.zig");
+pub const Stmt = stmt.Stmt;
 pub const Token = tok.Token;
 pub const TokenType = tok.TokenType;
+
+pub fn ParseType(comptime fields: type) type {
+    const fields_info = @typeInfo(fields).@"struct".fields;
+
+    return @Type(.{
+        .@"struct" = .{
+            .layout = .auto,
+            .fields = fields_info,
+            .decls = &.{},
+            .is_tuple = false,
+        },
+    });
+}
 
 pub const Location = struct {
     line: usize = 0,

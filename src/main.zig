@@ -88,6 +88,9 @@ fn processData(gpa: std.mem.Allocator, data: []const u8) !u8 {
     var diagnostics: DiagnosticReporter = .init(gpa);
 
     var scanner: Scanner = try .init(gpa, data, &diagnostics);
+    var parser: Parser = .init(gpa, &diagnostics);
+    var interpreter: Interpreter = .init(gpa, &diagnostics);
+
     const tokens = scanner.scanTokens() catch {
         std.log.err("Lexing Complete with Error(s)", .{});
         if (diagnostics.hasErrors()) {
@@ -98,15 +101,13 @@ fn processData(gpa: std.mem.Allocator, data: []const u8) !u8 {
     };
 
     if (tokens.len <= 1) return 0;
-
     diagnostics.clearErrors();
     std.log.info("Lexing Complete with {d} tokens", .{tokens.len});
     // for (tokens) |token| {
     //     std.log.debug("{f}", .{token});
     // }
 
-    var parser: Parser = .init(gpa, tokens[0..], &diagnostics);
-    const result = parser.parse() catch {
+    const statements = parser.parse(tokens) catch {
         std.log.err("Parsing Complete with Error(s)", .{});
         if (diagnostics.hasErrors()) {
             try diagnostics.printDiagnostics(err_writer);
@@ -114,19 +115,15 @@ fn processData(gpa: std.mem.Allocator, data: []const u8) !u8 {
         }
         return lex_parse_err;
     };
-
+    if (statements.len == 0) return 0;
     std.log.info("Parsing complete", .{});
     diagnostics.clearErrors();
-    std.log.debug("{f}", .{result});
 
-    var interpreter: Interpreter = .init(gpa, &diagnostics);
-    const return_val = try interpreter.evalExpr(result);
+    _ = try interpreter.interpret(statements);
     if (diagnostics.hasErrors()) {
         try diagnostics.printDiagnostics(err_writer);
-        try err_writer.flush();
         return runtime_err;
     }
-    std.log.debug("Return Value: {f}", .{return_val});
 
     return 0;
 }
