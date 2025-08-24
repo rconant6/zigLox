@@ -2,54 +2,28 @@ const std = @import("std");
 const lox = @import("lox.zig");
 const out_writer = lox.out_writer;
 const DiagnosticReporter = lox.DiagnosticReporter;
+const Environment = lox.Environment;
 const ErrorContext = lox.ErrorContext;
 const Expr = lox.Expr;
 const LoxError = lox.LoxError;
+const RuntimeValue = lox.RuntimeValue;
 const Stmt = lox.Stmt;
 const Token = lox.Token;
-
-pub const RuntimeValue = union(enum) {
-    Bool: bool,
-    Nil: void,
-    Number: f64,
-    String: []const u8,
-
-    pub fn isEqual(self: RuntimeValue, other: RuntimeValue) bool {
-        std.debug.assert(std.meta.activeTag(self) == std.meta.activeTag(other));
-
-        return switch (self) {
-            .Bool => |b| b == other.Bool,
-            .Nil => true,
-            .Number => |n| n == other.Number,
-            .String => |s| std.mem.eql(u8, s, other.String),
-        };
-    }
-
-    fn isTruthy(val: RuntimeValue) bool {
-        return switch (val) {
-            .Bool => |b| b,
-            .Nil => false,
-            else => true,
-        };
-    }
-    pub fn format(val: RuntimeValue, w: *std.Io.Writer) std.Io.Writer.Error!void {
-        try switch (val) {
-            .Bool => |b| w.print("{}", .{b}),
-            .Nil => w.print("NIL", .{}),
-            .Number => |n| w.print("{d}", .{n}),
-            .String => |s| w.print("{s}", .{s}),
-        };
-    }
-};
 
 pub const Interpreter = struct {
     allocator: std.mem.Allocator,
     diagnostics: *DiagnosticReporter,
+    environment: *Environment,
 
-    pub fn init(gpa: std.mem.Allocator, diagnostic: *DiagnosticReporter) Interpreter {
+    pub fn init(
+        gpa: std.mem.Allocator,
+        diagnostic: *DiagnosticReporter,
+        env: *Environment,
+    ) Interpreter {
         return .{
             .allocator = gpa,
             .diagnostics = diagnostic,
+            .environment = env,
         };
     }
 
@@ -67,7 +41,10 @@ pub const Interpreter = struct {
                 try out_writer.print("{f}\n", .{value});
                 try out_writer.flush();
             },
-            .Variable => {},
+            .Variable => |v| {
+                const value = if (v.value) |val| try self.evalExpr(val) else RuntimeValue.Nil;
+                try self.environment.define(v.name.lexeme, value);
+            },
         }
     }
 
@@ -104,7 +81,9 @@ pub const Interpreter = struct {
                     else => return .{ .Nil = {} },
                 }
             },
-            .Variable => |_| return .{ .Nil = {} },
+            .Variable => |v| {
+                return self.environment.get(v.name.lexeme);
+            },
         }
     }
 

@@ -5,17 +5,51 @@ const lerr = @import("loxError.zig");
 const tok = @import("token.zig");
 const stmt = @import("statement.zig");
 pub const DiagnosticReporter = @import("DiagnoticReporter.zig");
+pub const Environment = @import("Environment.zig");
 pub const ErrorContext = lerr.ErrorContext;
 pub const Expr = exp.Expr;
 pub const ExprValue = exp.ExprValue;
 pub const Interpreter = intp.Interpreter;
 pub const LoxError = lerr.LoxError;
 pub const Parser = @import("Parser.zig");
-pub const RuntimeValue = intp.RuntimeValue;
 pub const Scanner = @import("Scanner.zig");
 pub const Stmt = stmt.Stmt;
 pub const Token = tok.Token;
 pub const TokenType = tok.TokenType;
+
+pub const RuntimeValue = union(enum) {
+    Bool: bool,
+    Nil: void,
+    Number: f64,
+    String: []const u8,
+
+    pub fn isEqual(self: RuntimeValue, other: RuntimeValue) bool {
+        std.debug.assert(std.meta.activeTag(self) == std.meta.activeTag(other));
+
+        return switch (self) {
+            .Bool => |b| b == other.Bool,
+            .Nil => true,
+            .Number => |n| n == other.Number,
+            .String => |s| std.mem.eql(u8, s, other.String),
+        };
+    }
+
+    pub fn isTruthy(val: RuntimeValue) bool {
+        return switch (val) {
+            .Bool => |b| b,
+            .Nil => false,
+            else => true,
+        };
+    }
+    pub fn format(val: RuntimeValue, w: *std.Io.Writer) std.Io.Writer.Error!void {
+        try switch (val) {
+            .Bool => |b| w.print("{}", .{b}),
+            .Nil => w.print("NIL", .{}),
+            .Number => |n| w.print("{d}", .{n}),
+            .String => |s| w.print("{s}", .{s}),
+        };
+    }
+};
 
 pub fn ParseType(comptime fields: type) type {
     const fields_info = @typeInfo(fields).@"struct".fields;

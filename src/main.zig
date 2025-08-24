@@ -1,6 +1,7 @@
 const std = @import("std");
 const lox = @import("lox.zig");
 const DiagnosticReporter = lox.DiagnosticReporter;
+const Environment = lox.Environment;
 const Interpreter = lox.Interpreter;
 const Parser = lox.Parser;
 const Scanner = lox.Scanner;
@@ -35,6 +36,10 @@ pub fn main() !void {
 fn runFromPrompt(gpa: std.mem.Allocator) anyerror!void {
     try out_writer.print("ZLox REPL - Welcome! type 'exit' to quit\n", .{});
 
+    const global_env = try gpa.create(Environment);
+    defer gpa.destroy(global_env);
+    global_env.* = .init(gpa);
+
     while (true) {
         try out_writer.print("zlox> ", .{});
         try out_writer.flush();
@@ -53,7 +58,7 @@ fn runFromPrompt(gpa: std.mem.Allocator) anyerror!void {
 
         if (std.mem.eql(u8, trimmed, "exit")) break;
 
-        _ = processData(gpa, trimmed) catch |err| {
+        _ = processData(gpa, trimmed, global_env) catch |err| {
             try err_writer.print("ERROR: {any}\n", .{err});
             try err_writer.flush();
         };
@@ -80,22 +85,22 @@ fn runFromFile(gpa: std.mem.Allocator, file_name: []const u8) !void {
     const bytes = try file.readAll(data);
     std.debug.assert(bytes == stats.size);
 
-    const return_val = try processData(gpa, data);
+    var env: Environment = .init(gpa);
+    const return_val = try processData(gpa, data, &env);
     std.process.exit(return_val);
 }
 
-fn processData(gpa: std.mem.Allocator, data: []const u8) !u8 {
+fn processData(gpa: std.mem.Allocator, data: []const u8, env: *Environment) !u8 {
     var diagnostics: DiagnosticReporter = .init(gpa);
 
     var scanner: Scanner = try .init(gpa, data, &diagnostics);
     var parser: Parser = .init(gpa, &diagnostics);
-    var interpreter: Interpreter = .init(gpa, &diagnostics);
+    var interpreter: Interpreter = .init(gpa, &diagnostics, env);
 
     const tokens = scanner.scanTokens() catch {
         std.log.err("Lexing Complete with Error(s)", .{});
         if (diagnostics.hasErrors()) {
             try diagnostics.printDiagnostics(err_writer);
-            try err_writer.flush();
         }
         return lex_parse_err;
     };
@@ -111,15 +116,16 @@ fn processData(gpa: std.mem.Allocator, data: []const u8) !u8 {
         std.log.err("Parsing Complete with Error(s)", .{});
         if (diagnostics.hasErrors()) {
             try diagnostics.printDiagnostics(err_writer);
-            try err_writer.flush();
         }
         return lex_parse_err;
     };
+
     if (statements.len == 0) return 0;
     std.log.info("Parsing complete", .{});
     diagnostics.clearErrors();
 
     _ = try interpreter.interpret(statements);
+
     if (diagnostics.hasErrors()) {
         try diagnostics.printDiagnostics(err_writer);
         return runtime_err;

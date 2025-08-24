@@ -86,8 +86,8 @@ pub const Token = struct {
     }
     pub fn format(t: Token, w: *std.Io.Writer) std.Io.Writer.Error!void {
         try w.print(
-            "Token: Type: {t:<14} at :{f} Text: {s:<10}, Literal: {any}",
-            .{ t.type, t.loc, t.lexeme, t.literal },
+            "Token: Type: {t:<14} at :{f} Text: {s:<10}",
+            .{ t.type, t.loc, t.lexeme },
         );
     }
 };

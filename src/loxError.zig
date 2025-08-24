@@ -79,7 +79,7 @@ pub const ErrorContext = struct {
             try w.print(" at {f}", .{loc});
         }
         if (ctx.token) |token| {
-            try w.print(" near '{f}'", .{token});
+            try w.print(" near {s}", .{token.lexeme});
         }
     }
 };

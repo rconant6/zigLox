@@ -55,7 +55,7 @@ pub const Expr = union(enum) {
                 try w.print("Unary: {s} {f}", .{ u.op.lexeme, u.expr });
             },
             .Variable => |v| {
-                try w.print("Variable: {s}", .{v.name.value.String});
+                try w.print("Variable: {s}", .{v.name.lexeme});
             },
         }
     }

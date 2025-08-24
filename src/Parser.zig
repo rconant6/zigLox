@@ -73,6 +73,7 @@ fn varStatement(self: *Parser) LoxError!*Stmt {
             return LoxError.ExpectedIdentifier;
         }
     }
+
     return try self.statement();
 }
 
@@ -92,6 +93,7 @@ fn varDecl(self: *Parser, id: Token) LoxError!*Stmt {
     const node = try self.allocator.create(Stmt);
     errdefer self.allocator.destroy(node);
     node.* = .{ .Variable = .{ .name = id, .value = expr } };
+
     return node;
 }
 
@@ -106,7 +108,7 @@ fn statement(self: *Parser) LoxError!*Stmt {
 fn exprStatement(self: *Parser) LoxError!*Stmt {
     const expr = try self.expression();
 
-    if (self.match(&.{.SEMICOLON})) |_| {} else {
+    if (self.consume(.SEMICOLON)) |_| {} else {
         const token = self.previous() orelse self.source[self.current];
         self.parseError(
             LoxError.ExpectedSemiColon,
@@ -231,7 +233,11 @@ fn primary(self: *Parser) LoxError!*Expr {
             node.* = .{ .Group = .{ .expr = expr } };
             return node;
         },
-        .IDENTIFIER => {},
+        .IDENTIFIER => {
+            self.advance();
+            node.* = .{ .Variable = .{ .name = token } };
+            return node;
+        },
         else => {
             const err_token = self.previous() orelse self.source[self.current];
             self.parseError(LoxError.ExpectedExpression, "Expected expression", err_token);
