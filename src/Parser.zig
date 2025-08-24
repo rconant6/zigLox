@@ -55,6 +55,7 @@ pub fn parse(self: *Parser, tokens: []const Token) LoxError![]const Stmt {
     return statements.toOwnedSlice(self.allocator);
 }
 
+// MARK: STATEMENTS START
 fn declaration(self: *Parser) LoxError!*Stmt {
     return try self.varStatement();
 }
@@ -140,9 +141,40 @@ fn printStatement(self: *Parser) LoxError!*Stmt {
 
     return node;
 }
-
+// MARK: STATEMENTS END
+// MARK: EXPRESSION START
 fn expression(self: *Parser) LoxError!*Expr {
-    return self.equality();
+    return self.assignment();
+}
+
+fn assignment(self: *Parser) LoxError!*Expr {
+    const expr = try self.equality();
+    errdefer self.freeExpr(expr);
+
+    if (self.match(&.{.EQUAL})) |_| {
+        _ = self.previous();
+        const value = try self.assignment();
+        errdefer self.freeExpr(value);
+
+        if (expr.* == .Variable) {
+            const node = try self.allocator.create(Expr);
+            errdefer self.allocator.destroy(node);
+            node.* = .{ .Assign = .{
+                .name = expr.Variable.name,
+                .value = value,
+            } };
+
+            return node;
+        }
+        self.parseError(
+            LoxError.ExpectedLVal,
+            "Expected LVal for assignment",
+            self.previous() orelse self.source[self.current - 3],
+        );
+        return LoxError.ExpectedLVal;
+    }
+
+    return expr;
 }
 
 fn equality(self: *Parser) LoxError!*Expr {
@@ -248,6 +280,7 @@ fn primary(self: *Parser) LoxError!*Expr {
     self.parseError(LoxError.ExpectedExpression, "Expected expression", self.source[self.current]);
     return LoxError.ExpectedExpression;
 }
+// MARK: EXPRESSION START
 
 // MARK: Parsing Creators
 fn parseBinary(self: *Parser, comptime token_types: []const TokenType, next: fn (*Parser) LoxError!*Expr) LoxError!*Expr {
@@ -299,6 +332,9 @@ fn synchronize(self: *Parser) void {
 // MARK: MemoryManagement
 fn freeExpr(self: *Parser, expr: *Expr) void {
     switch (expr.*) {
+        .Assign => |a| {
+            self.freeExpr(a.value);
+        },
         .Binary => |b| {
             self.freeExpr(b.left);
             self.freeExpr(b.right);

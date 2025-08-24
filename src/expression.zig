@@ -18,6 +18,10 @@ pub const ExprValue = union(enum) {
 };
 
 pub const Expr = union(enum) {
+    Assign: ParseType(struct {
+        name: Token,
+        value: *Expr,
+    }),
     Binary: ParseType(struct {
         left: *Expr,
         op: Token,
@@ -39,6 +43,9 @@ pub const Expr = union(enum) {
 
     pub fn format(expr: Expr, w: *std.Io.Writer) !void {
         switch (expr) {
+            .Assign => |a| {
+                try w.print("AssignExpr: {s} = {f}", .{ a.name, a.value });
+            },
             .Binary => |b| {
                 try w.print(
                     "BinaryExpr: {f} {s} {f}",

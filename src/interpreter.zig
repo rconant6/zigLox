@@ -50,6 +50,11 @@ pub const Interpreter = struct {
 
     pub fn evalExpr(self: *Interpreter, expr: *Expr) LoxError!RuntimeValue {
         switch (expr.*) {
+            .Assign => |a| {
+                const value = try self.evalExpr(a.value);
+                try self.environment.assign(a.name.lexeme, value);
+                return value;
+            },
             .Binary => |b| {
                 const right = try self.evalExpr(b.right);
                 const left = try self.evalExpr(b.left);

@@ -30,7 +30,7 @@ pub fn get(self: *Environment, name: []const u8) !RuntimeValue {
 
 pub fn assign(self: *Environment, name: []const u8, val: RuntimeValue) !void {
     if (self.env.contains(name)) {
-        try self.env.put(name, val);
+        return try self.env.put(name, val);
     }
 
     return LoxError.UndefinedVariable;
