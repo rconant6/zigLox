@@ -45,7 +45,7 @@ pub const Interpreter = struct {
                     self.allocator.destroy(inner_env);
                 }
                 return for (b.statements) |s| {
-                    self.execute(s) catch |err| {
+                    self.execute(s.*) catch |err| {
                         self.processRuntimeError(err, "RUNTIME ERROR in Block", b.loc);
                         return err;
                     };

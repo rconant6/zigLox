@@ -6,7 +6,7 @@ const Token = lox.Token;
 
 pub const Stmt = union(enum) {
     Block: ParseType(struct {
-        statements: []const Stmt,
+        statements: []const *Stmt,
         loc: Token,
     }),
     Expression: ParseType(struct {

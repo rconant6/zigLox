@@ -94,12 +94,24 @@ fn varDecl(self: *Parser, id: Token) LoxError!*Stmt {
     return self.createStmt(.{ .Variable = .{ .name = id, .value = expr } });
 }
 
+fn varDeclNoSemiColon(self: *Parser, id: Token) LoxError!*Stmt {
+    var expr: ?*Expr = null;
+
+    if (self.match(&.{.EQUAL})) |_| {
+        expr = try self.expression();
+    }
+
+    return self.createStmt(.{ .Variable = .{ .name = id, .value = expr } });
+}
+
 fn statement(self: *Parser) LoxError!*Stmt {
     if (self.match(&.{
         .IF,    .LEFT_BRACE,
         .PRINT, .WHILE,
+        .FOR,
     })) |tok| {
         switch (tok.type) {
+            .FOR => return self.forStatement(),
             .IF => return self.ifStatement(),
             .LEFT_BRACE => return self.blockStatement(),
             .PRINT => return self.printStatement(),
@@ -128,11 +140,11 @@ fn exprStatement(self: *Parser) LoxError!*Stmt {
 }
 
 fn blockStatement(self: *Parser) LoxError!*Stmt {
-    var statements: std.ArrayList(Stmt) = .empty;
+    var statements: std.ArrayList(*Stmt) = .empty;
 
     while (!self.check(.RIGHT_BRACE)) {
         const new_stmt = try self.declaration();
-        try statements.append(self.allocator, new_stmt.*);
+        try statements.append(self.allocator, new_stmt);
     }
 
     _ = try self.expect(.RIGHT_BRACE, "Expect '}' after block.");
@@ -143,6 +155,66 @@ fn blockStatement(self: *Parser) LoxError!*Stmt {
     } });
 }
 
+fn forStatement(self: *Parser) LoxError!*Stmt {
+    const loc = try self.expect(.LEFT_PAREN, "Expect '(' after 'for'");
+
+    // Parse initializer
+    const initializer = if (self.consume(.SEMICOLON)) |_|
+        null
+    else if (self.consume(.VAR)) |_| blk: {
+        const id = try self.expect(.IDENTIFIER, "Expected variable name after 'var'");
+        break :blk try self.varDeclNoSemiColon(id);
+    } else blk: {
+        const expr = try self.expression();
+        break :blk try self.createStmt(.{ .Expression = .{ .value = expr } });
+    };
+
+    _ = try self.expect(.SEMICOLON, "Expect ';' after for loop initializer");
+
+    // Parse condition
+    const condition = if (self.check(.SEMICOLON))
+        try self.createLiteralExpr(.{ .Bool = true })
+    else
+        try self.expression();
+
+    _ = try self.expect(.SEMICOLON, "Expect ';' after loop condition");
+
+    // Parse increment
+    const increment = if (self.check(.RIGHT_PAREN))
+        null
+    else
+        try self.expression();
+
+    _ = try self.expect(.RIGHT_PAREN, "Expect ')' after 'for' clauses");
+
+    const body = try self.statement();
+
+    // Create while loop body with proper memory allocation
+    const while_body = if (increment) |inc| blk: {
+        const increment_stmt = try self.createStmt(.{ .Expression = .{ .value = inc } });
+
+        // Allocate array properly instead of using stack reference
+        const combined_stmts = try self.allocator.alloc(*Stmt, 2);
+        combined_stmts[0] = body;
+        combined_stmts[1] = increment_stmt;
+
+        break :blk try self.createStmt(.{ .Block = .{ .loc = loc, .statements = combined_stmts } });
+    } else body;
+
+    const while_stmt = try self.createStmt(.{ .While = .{
+        .condition = condition,
+        .body = while_body,
+    } });
+
+    return if (initializer) |init_stmt| blk: {
+        // Same fix here - allocate properly
+        const combined_stmts = try self.allocator.alloc(*Stmt, 2);
+        combined_stmts[0] = init_stmt;
+        combined_stmts[1] = while_stmt;
+
+        break :blk try self.createStmt(.{ .Block = .{ .loc = loc, .statements = combined_stmts } });
+    } else while_stmt;
+}
 fn ifStatement(self: *Parser) LoxError!*Stmt {
     _ = try self.expect(.LEFT_PAREN, "Expect '(' after 'if'");
     const condition = try self.expression();
