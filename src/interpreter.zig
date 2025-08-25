@@ -70,6 +70,14 @@ pub const Interpreter = struct {
                 const value = if (v.value) |val| try self.evalExpr(val) else RuntimeValue.Nil;
                 try self.environment.define(v.name.lexeme, value);
             },
+            .While => |w| {
+                while (true) {
+                    const condition = try self.evalExpr(w.condition);
+                    if (!condition.isTruthy()) break;
+
+                    try self.execute(w.body.*);
+                }
+            },
         }
     }
 

@@ -24,6 +24,10 @@ pub const Stmt = union(enum) {
         name: Token,
         value: ?*Expr,
     }),
+    While: ParseType(struct {
+        condition: *Expr,
+        body: *Stmt,
+    }),
 
     pub fn format(stmt: Stmt, w: *std.Io.Writer) std.Io.Writer.Error!void {
         switch (stmt) {
@@ -44,6 +48,9 @@ pub const Stmt = union(enum) {
             },
             .Variable => |v| {
                 try w.print("Variable: {s} = {}", .{ v.name.lexeme, v.value });
+            },
+            .While => |e| {
+                try w.print("WhileStmt: ({f})", .{e.condition});
             },
         }
     }

@@ -97,12 +97,13 @@ fn varDecl(self: *Parser, id: Token) LoxError!*Stmt {
 fn statement(self: *Parser) LoxError!*Stmt {
     if (self.match(&.{
         .IF,    .LEFT_BRACE,
-        .PRINT,
+        .PRINT, .WHILE,
     })) |tok| {
         switch (tok.type) {
             .IF => return self.ifStatement(),
             .LEFT_BRACE => return self.blockStatement(),
             .PRINT => return self.printStatement(),
+            .WHILE => return self.whileStatement(),
             else => unreachable,
         }
     }
@@ -173,6 +174,20 @@ fn printStatement(self: *Parser) LoxError!*Stmt {
     }
 
     return self.createStmt(.{ .Print = .{ .value = expr } });
+}
+
+fn whileStatement(self: *Parser) LoxError!*Stmt {
+    _ = try self.expect(.LEFT_PAREN, "Expect '(' after 'if'");
+    const condition = try self.expression();
+    errdefer self.freeExpr(condition);
+    _ = try self.expect(.RIGHT_PAREN, "Expect ')' after 'if' condition");
+
+    const body = try self.statement();
+
+    return self.createStmt(.{ .While = .{
+        .condition = condition,
+        .body = body,
+    } });
 }
 
 // MARK: STATEMENTS END
