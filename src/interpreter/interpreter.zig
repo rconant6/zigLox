@@ -1,5 +1,5 @@
 const std = @import("std");
-const lox = @import("lox.zig");
+const lox = @import("../lox.zig");
 const out_writer = lox.out_writer;
 const DiagnosticReporter = lox.DiagnosticReporter;
 const Environment = lox.Environment;

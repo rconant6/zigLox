@@ -1,7 +1,7 @@
 pub const Scanner = @This();
 
 const std = @import("std");
-const lox = @import("lox.zig");
+const lox = @import("../lox.zig");
 const DiagnosticsReporter = lox.DiagnosticReporter;
 const ErrorContext = lox.ErrorContext;
 const Location = lox.Location;

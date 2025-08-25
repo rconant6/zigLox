@@ -1,5 +1,5 @@
 const std = @import("std");
-const lox = @import("lox.zig");
+const lox = @import("../lox.zig");
 const ParseType = lox.ParseType;
 const Token = lox.Token;
 
@@ -29,6 +29,11 @@ pub const Expr = union(enum) {
         op: Token,
         right: *Expr,
     }),
+    // Call: ParseType(struct {
+    //     calee: *Expr,
+    //     paren: Token,
+    //     args: []*Expr,
+    // }),
     Group: ParseType(struct {
         expr: *Expr,
     }),

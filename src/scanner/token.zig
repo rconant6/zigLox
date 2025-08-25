@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const lox = @import("lox.zig");
+const lox = @import("../lox.zig");
 const LiteralValue = lox.LiteralValue;
 const Location = lox.Location;
 

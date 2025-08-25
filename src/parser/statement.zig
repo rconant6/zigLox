@@ -1,5 +1,5 @@
 const std = @import("std");
-const lox = @import("lox.zig");
+const lox = @import("../lox.zig");
 const Expr = lox.Expr;
 const ParseType = lox.ParseType;
 const Token = lox.Token;

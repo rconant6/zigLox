@@ -1,7 +1,7 @@
 pub const Environment = @This();
 
 const std = @import("std");
-const lox = @import("lox.zig");
+const lox = @import("../lox.zig");
 const LoxError = lox.LoxError;
 const RuntimeValue = lox.RuntimeValue;
 
