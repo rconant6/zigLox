@@ -35,6 +35,22 @@ pub const Interpreter = struct {
 
     fn execute(self: *Interpreter, stmt: Stmt) LoxError!void {
         switch (stmt) {
+            .Block => |b| {
+                const outer_env = self.environment;
+                const inner_env = try self.allocator.create(Environment);
+                inner_env.* = Environment.createLocalEnv(outer_env);
+                self.environment = inner_env;
+                defer {
+                    self.environment = outer_env;
+                    self.allocator.destroy(inner_env);
+                }
+                return for (b.statements) |s| {
+                    self.execute(s) catch |err| {
+                        self.processRuntimeError(err, "RUNTIME ERROR in Block", b.loc);
+                        return err;
+                    };
+                };
+            },
             .Expression => |e| _ = try self.evalExpr(e.value),
             .Print => |p| {
                 const value = try self.evalExpr(p.value);

@@ -102,6 +102,9 @@ fn statement(self: *Parser) LoxError!*Stmt {
     if (self.match(&.{.PRINT})) |_| {
         return self.printStatement();
     }
+    if (self.match(&.{.LEFT_BRACE})) |_| {
+        return self.blockStatement();
+    }
 
     return self.exprStatement();
 }
@@ -122,6 +125,26 @@ fn exprStatement(self: *Parser) LoxError!*Stmt {
     const node = try self.allocator.create(Stmt);
     errdefer self.allocator.destroy(node);
     node.* = .{ .Expression = .{ .value = expr } };
+
+    return node;
+}
+
+fn blockStatement(self: *Parser) LoxError!*Stmt {
+    var statements: std.ArrayList(Stmt) = .empty;
+
+    while (!self.check(.RIGHT_BRACE)) {
+        const new_stmt = try self.declaration();
+        try statements.append(self.allocator, new_stmt.*);
+    }
+
+    _ = try self.expect(.RIGHT_BRACE, "Expect '}' after block.");
+
+    const node = try self.allocator.create(Stmt);
+    errdefer self.allocator.destroy(node);
+    node.* = .{ .Block = .{
+        .statements = try statements.toOwnedSlice(self.allocator),
+        .loc = self.previous() orelse self.source[self.current],
+    } };
 
     return node;
 }
@@ -404,4 +427,6 @@ fn expect(self: *Parser, t_type: TokenType, message: []const u8) !Token {
         return token;
     const token = self.peek() orelse self.source[self.current - 1];
     self.parseError(LoxError.ExpectedToken, message, token);
+
+    return LoxError.ExpectedToken;
 }

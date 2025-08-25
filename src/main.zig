@@ -85,8 +85,11 @@ fn runFromFile(gpa: std.mem.Allocator, file_name: []const u8) !void {
     const bytes = try file.readAll(data);
     std.debug.assert(bytes == stats.size);
 
-    var env: Environment = .createGlobalEnv(gpa);
-    const return_val = try processData(gpa, data, &env);
+    const global_env = try gpa.create(Environment);
+    defer gpa.destroy(global_env);
+    global_env.* = .createGlobalEnv(gpa);
+
+    const return_val = try processData(gpa, data, global_env);
     std.process.exit(return_val);
 }
 
@@ -124,7 +127,13 @@ fn processData(gpa: std.mem.Allocator, data: []const u8, env: *Environment) !u8 
     std.log.info("Parsing complete", .{});
     diagnostics.clearErrors();
 
-    _ = try interpreter.interpret(statements);
+    _ = interpreter.interpret(statements) catch |err| {
+        std.log.err("Runtime exited with error {}", .{err});
+        if (diagnostics.hasErrors()) {
+            try diagnostics.printDiagnostics(err_writer);
+        }
+        return lex_parse_err;
+    };
 
     if (diagnostics.hasErrors()) {
         try diagnostics.printDiagnostics(err_writer);

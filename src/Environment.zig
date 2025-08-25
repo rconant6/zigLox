@@ -50,7 +50,7 @@ pub fn assign(self: *Environment, name: []const u8, val: RuntimeValue) !void {
 }
 
 pub fn debugPrintAll(self: *Environment) void {
-    std.debug.print("DEBUG: Environment contents ({} items):\n", .{self.env.count()});
+    std.debug.print("DEBUG: Environment at {*} contents ({} items):\n", .{ self, self.env.count() });
     var iterator = self.env.iterator();
     while (iterator.next()) |entry| {
         std.debug.print("  key='{s}' value={any}\n", .{ entry.key_ptr.*, entry.value_ptr.* });

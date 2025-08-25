@@ -5,6 +5,10 @@ const ParseType = lox.ParseType;
 const Token = lox.Token;
 
 pub const Stmt = union(enum) {
+    Block: ParseType(struct {
+        statements: []const Stmt,
+        loc: Token,
+    }),
     Expression: ParseType(struct {
         value: *Expr,
     }),
@@ -18,6 +22,12 @@ pub const Stmt = union(enum) {
 
     pub fn format(stmt: Stmt, w: *std.Io.Writer) std.Io.Writer.Error!void {
         switch (stmt) {
+            .Block => |b| {
+                try w.print("Block:\n", .{});
+                for (b.statements) |statement| {
+                    try w.print("  {f}", .{statement});
+                }
+            },
             .Expression => |e| {
                 try w.print("ExpressionStmt: {f}", .{e.value});
             },
