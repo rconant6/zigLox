@@ -38,7 +38,7 @@ fn runFromPrompt(gpa: std.mem.Allocator) anyerror!void {
 
     const global_env = try gpa.create(Environment);
     defer gpa.destroy(global_env);
-    global_env.* = .init(gpa);
+    global_env.* = .createGlobalEnv(gpa);
 
     while (true) {
         try out_writer.print("zlox> ", .{});
@@ -85,7 +85,7 @@ fn runFromFile(gpa: std.mem.Allocator, file_name: []const u8) !void {
     const bytes = try file.readAll(data);
     std.debug.assert(bytes == stats.size);
 
-    var env: Environment = .init(gpa);
+    var env: Environment = .createGlobalEnv(gpa);
     const return_val = try processData(gpa, data, &env);
     std.process.exit(return_val);
 }

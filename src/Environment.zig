@@ -5,13 +5,22 @@ const lox = @import("lox.zig");
 const LoxError = lox.LoxError;
 const RuntimeValue = lox.RuntimeValue;
 
+parent: ?*Environment = null,
 env: std.StringHashMap(RuntimeValue),
 gpa: std.mem.Allocator,
 
-pub fn init(allocator: std.mem.Allocator) Environment {
+pub fn createGlobalEnv(allocator: std.mem.Allocator) Environment {
     return .{
         .gpa = allocator,
         .env = std.StringHashMap(RuntimeValue).init(allocator),
+    };
+}
+
+pub fn createLocalEnv(parent: *Environment) Environment {
+    return .{
+        .parent = parent,
+        .env = std.StringHashMap(RuntimeValue).init(parent.gpa),
+        .gpa = parent.gpa,
     };
 }
 
@@ -25,6 +34,8 @@ pub fn get(self: *Environment, name: []const u8) !RuntimeValue {
         return val;
     }
 
+    if (self.parent) |parent| return parent.get(name);
+
     return LoxError.UndefinedVariable;
 }
 
@@ -32,6 +43,8 @@ pub fn assign(self: *Environment, name: []const u8, val: RuntimeValue) !void {
     if (self.env.contains(name)) {
         return try self.env.put(name, val);
     }
+
+    if (self.parent) |parent| return parent.assign(name, val);
 
     return LoxError.UndefinedVariable;
 }

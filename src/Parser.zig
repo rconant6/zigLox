@@ -130,8 +130,12 @@ fn printStatement(self: *Parser) LoxError!*Stmt {
     const expr = try self.expression();
 
     if (self.match(&.{.SEMICOLON})) |_| {} else {
-        const token = self.previous() orelse self.source[self.current];
-        self.parseError(LoxError.ExpectedSemiColon, "Expected ';' to end an print statement", token);
+        const err_token = self.previous() orelse self.source[self.current];
+        self.parseError(
+            LoxError.ExpectedSemiColon,
+            "Expected ';' to end an print statement",
+            err_token,
+        );
         return LoxError.ExpectedSemiColon;
     }
 
