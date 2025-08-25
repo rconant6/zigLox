@@ -90,6 +90,18 @@ pub const Interpreter = struct {
                 .String => |s| RuntimeValue{ .String = s },
                 .Number => |n| RuntimeValue{ .Number = n },
                 .Bool => |b| RuntimeValue{ .Bool = b },
+                .Nil => .Nil,
+            },
+            .Logical => |l| {
+                const left = try self.evalExpr(l.left);
+
+                if (l.op.type == .OR) {
+                    if (left.isTruthy()) return left;
+                } else {
+                    if (!left.isTruthy()) return left;
+                }
+
+                return self.evalExpr(l.right);
             },
             .Unary => |u| {
                 const right = try self.evalExpr(u.expr);
