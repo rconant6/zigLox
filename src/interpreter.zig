@@ -52,6 +52,15 @@ pub const Interpreter = struct {
                 };
             },
             .Expression => |e| _ = try self.evalExpr(e.value),
+            .If => |i| {
+                const condition = try self.evalExpr(i.condition);
+
+                if (condition.isTruthy()) {
+                    try self.execute(i.then_branch.*);
+                } else if (i.else_branch) |eb| {
+                    try self.execute(eb.*);
+                }
+            },
             .Print => |p| {
                 const value = try self.evalExpr(p.value);
                 try out_writer.print("{f}\n", .{value});

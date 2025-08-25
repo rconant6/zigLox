@@ -99,11 +99,16 @@ fn varDecl(self: *Parser, id: Token) LoxError!*Stmt {
 }
 
 fn statement(self: *Parser) LoxError!*Stmt {
-    if (self.match(&.{.PRINT})) |_| {
-        return self.printStatement();
-    }
-    if (self.match(&.{.LEFT_BRACE})) |_| {
-        return self.blockStatement();
+    if (self.match(&.{
+        .IF,    .LEFT_BRACE,
+        .PRINT,
+    })) |tok| {
+        switch (tok.type) {
+            .IF => return self.ifStatement(),
+            .LEFT_BRACE => return self.blockStatement(),
+            .PRINT => return self.printStatement(),
+            else => unreachable,
+        }
     }
 
     return self.exprStatement();
@@ -149,8 +154,30 @@ fn blockStatement(self: *Parser) LoxError!*Stmt {
     return node;
 }
 
+fn ifStatement(self: *Parser) LoxError!*Stmt {
+    _ = try self.expect(.LEFT_PAREN, "Expect '(' after 'if'");
+    const condition = try self.expression();
+    errdefer self.freeExpr(condition);
+    _ = try self.expect(.RIGHT_PAREN, "Expect ')' after 'if' condition");
+
+    const then_branch = try self.statement();
+    const else_branch = if (self.match(&.{.ELSE})) |_| try self.statement() else null;
+
+    const node = try self.allocator.create(Stmt);
+    node.* = .{
+        .If = .{
+            .condition = condition,
+            .then_branch = then_branch,
+            .else_branch = else_branch,
+        },
+    };
+
+    return node;
+}
+
 fn printStatement(self: *Parser) LoxError!*Stmt {
     const expr = try self.expression();
+    errdefer self.freeExpr(expr);
 
     if (self.match(&.{.SEMICOLON})) |_| {} else {
         const err_token = self.previous() orelse self.source[self.current];
@@ -163,7 +190,6 @@ fn printStatement(self: *Parser) LoxError!*Stmt {
     }
 
     const node = try self.allocator.create(Stmt);
-    errdefer self.allocator.destroy(node);
     node.* = .{ .Print = .{ .value = expr } };
 
     return node;
@@ -185,7 +211,6 @@ fn assignment(self: *Parser) LoxError!*Expr {
 
         if (expr.* == .Variable) {
             const node = try self.allocator.create(Expr);
-            errdefer self.allocator.destroy(node);
             node.* = .{ .Assign = .{
                 .name = expr.Variable.name,
                 .value = value,
@@ -233,9 +258,9 @@ fn factor(self: *Parser) LoxError!*Expr {
 fn unary(self: *Parser) LoxError!*Expr {
     if (self.match(&.{ .BANG, .MINUS })) |op| {
         const right = try self.unary();
+        errdefer self.freeExpr(right);
 
         const node = try self.allocator.create(Expr);
-        errdefer self.allocator.destroy(node);
         node.* = .{ .Unary = .{
             .op = op,
             .expr = right,
@@ -256,6 +281,7 @@ fn primary(self: *Parser) LoxError!*Expr {
     switch (token.type) {
         .TRUE, .FALSE => {
             self.advance();
+
             node.* = .{ .Literal = .{
                 .value = ExprValue{ .Bool = token.literal.bool },
             } };
@@ -263,6 +289,7 @@ fn primary(self: *Parser) LoxError!*Expr {
         },
         .NUMBER => {
             self.advance();
+
             node.* = .{ .Literal = .{
                 .value = ExprValue{ .Number = token.literal.number },
             } };
@@ -270,6 +297,7 @@ fn primary(self: *Parser) LoxError!*Expr {
         },
         .STRING => {
             self.advance();
+
             node.* = .{ .Literal = .{ .value = .{
                 .String = token.literal.string,
             } } };
@@ -277,6 +305,7 @@ fn primary(self: *Parser) LoxError!*Expr {
         },
         .LEFT_PAREN => {
             self.advance();
+
             const expr = try self.expression();
             errdefer self.freeExpr(expr);
 
@@ -294,6 +323,7 @@ fn primary(self: *Parser) LoxError!*Expr {
         },
         .IDENTIFIER => {
             self.advance();
+
             node.* = .{ .Variable = .{ .name = token } };
             return node;
         },
@@ -307,7 +337,7 @@ fn primary(self: *Parser) LoxError!*Expr {
     self.parseError(LoxError.ExpectedExpression, "Expected expression", self.source[self.current]);
     return LoxError.ExpectedExpression;
 }
-// MARK: EXPRESSION START
+// MARK: EXPRESSION END
 
 // MARK: Parsing Creators
 fn parseBinary(self: *Parser, comptime token_types: []const TokenType, next: fn (*Parser) LoxError!*Expr) LoxError!*Expr {
@@ -320,8 +350,6 @@ fn parseBinary(self: *Parser, comptime token_types: []const TokenType, next: fn 
         errdefer self.freeExpr(right);
 
         const node = try self.allocator.create(Expr);
-        errdefer self.allocator.destroy(node);
-
         node.* = .{ .Binary = .{
             .left = left,
             .op = token,

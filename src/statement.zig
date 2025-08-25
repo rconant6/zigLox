@@ -12,6 +12,11 @@ pub const Stmt = union(enum) {
     Expression: ParseType(struct {
         value: *Expr,
     }),
+    If: ParseType(struct {
+        condition: *Expr,
+        then_branch: *Stmt,
+        else_branch: ?*Stmt,
+    }),
     Print: ParseType(struct {
         value: *Expr,
     }),
@@ -27,6 +32,9 @@ pub const Stmt = union(enum) {
                 for (b.statements) |statement| {
                     try w.print("  {f}", .{statement});
                 }
+            },
+            .If => |i| {
+                try w.print("IfStmt: ({f})", .{i.condition});
             },
             .Expression => |e| {
                 try w.print("ExpressionStmt: {f}", .{e.value});
