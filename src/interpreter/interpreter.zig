@@ -64,7 +64,18 @@ pub const Interpreter = struct {
                 };
             },
             .Expression => |e| _ = try self.evalExpr(e.value),
-            .Function => |_| return LoxError.Unimplemented,
+            .Function => |f| {
+                const function = RuntimeValue{
+                    .Callable = .{
+                        .Function = .{
+                            .name = f.name,
+                            .params = f.params,
+                            .body = f.body,
+                        },
+                    },
+                };
+                try self.environment.define(f.name.lexeme, function);
+            },
             .If => |i| {
                 const condition = try self.evalExpr(i.condition);
 

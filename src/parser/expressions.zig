@@ -122,7 +122,7 @@ fn parseArguments(p: *Parser) LoxError![]const *Expr {
         const arg = try expression(p);
         try arguments.append(p.allocator, arg);
 
-        if (!p.check(.COMMA)) break;
+        if (p.consume(.COMMA)) |_| continue else break;
     }
 
     return arguments.toOwnedSlice(p.allocator);

@@ -246,7 +246,7 @@ fn functionStatement(p: *Parser, kind: []const u8) LoxError!*Stmt {
         const param = try p.expect(.IDENTIFIER, "Expect parameter name");
         try params.append(p.allocator, param);
 
-        if (!p.check(.COMMA)) break;
+        if (p.consume(.COMMA)) |_| continue else break;
     }
 
     _ = try p.expect(.RIGHT_PAREN, "Expect ')' after parameters");
@@ -259,7 +259,7 @@ fn functionStatement(p: *Parser, kind: []const u8) LoxError!*Stmt {
         .Function = .{
             .name = name,
             .params = try params.toOwnedSlice(p.allocator),
-            .body = body.Block.statements,
+            .body = body,
         },
     });
 }

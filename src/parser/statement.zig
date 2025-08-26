@@ -15,7 +15,7 @@ pub const Stmt = union(enum) {
     Function: ParseType(struct {
         name: Token,
         params: []Token,
-        body: []const *Stmt,
+        body: *Stmt,
     }),
     If: ParseType(struct {
         condition: *Expr,
@@ -42,9 +42,9 @@ pub const Stmt = union(enum) {
                     try w.print("  {f}", .{statement});
                 }
             },
+            .Expression => |e| try w.print("ExpressionStmt: {f}", .{e.value}),
             .Function => |f| try w.print("Function: {s}", .{f.name.lexeme}),
             .If => |i| try w.print("IfStmt: ({f})", .{i.condition}),
-            .Expression => |e| try w.print("ExpressionStmt: {f}", .{e.value}),
             .Print => |p| try w.print("PrintStmt: {f}", .{p.value}),
             .Variable => |v| try w.print("Variable: {s} = {}", .{ v.name.lexeme, v.value }),
             .While => |e| try w.print("WhileStmt: ({f})", .{e.condition}),
