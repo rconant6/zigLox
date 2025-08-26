@@ -12,6 +12,11 @@ pub const Stmt = union(enum) {
     Expression: ParseType(struct {
         value: *Expr,
     }),
+    Function: ParseType(struct {
+        name: Token,
+        params: []Token,
+        body: []const *Stmt,
+    }),
     If: ParseType(struct {
         condition: *Expr,
         then_branch: *Stmt,
@@ -37,21 +42,12 @@ pub const Stmt = union(enum) {
                     try w.print("  {f}", .{statement});
                 }
             },
-            .If => |i| {
-                try w.print("IfStmt: ({f})", .{i.condition});
-            },
-            .Expression => |e| {
-                try w.print("ExpressionStmt: {f}", .{e.value});
-            },
-            .Print => |p| {
-                try w.print("PrintStmt: {f}", .{p.value});
-            },
-            .Variable => |v| {
-                try w.print("Variable: {s} = {}", .{ v.name.lexeme, v.value });
-            },
-            .While => |e| {
-                try w.print("WhileStmt: ({f})", .{e.condition});
-            },
+            .Function => |f| try w.print("Function: {s}", .{f.name.lexeme}),
+            .If => |i| try w.print("IfStmt: ({f})", .{i.condition}),
+            .Expression => |e| try w.print("ExpressionStmt: {f}", .{e.value}),
+            .Print => |p| try w.print("PrintStmt: {f}", .{p.value}),
+            .Variable => |v| try w.print("Variable: {s} = {}", .{ v.name.lexeme, v.value }),
+            .While => |e| try w.print("WhileStmt: ({f})", .{e.condition}),
         }
     }
 };

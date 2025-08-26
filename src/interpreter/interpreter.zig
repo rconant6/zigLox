@@ -64,6 +64,7 @@ pub const Interpreter = struct {
                 };
             },
             .Expression => |e| _ = try self.evalExpr(e.value),
+            .Function => |_| return LoxError.Unimplemented,
             .If => |i| {
                 const condition = try self.evalExpr(i.condition);
 

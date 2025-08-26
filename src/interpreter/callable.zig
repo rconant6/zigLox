@@ -23,7 +23,7 @@ pub const Callable = union(enum) {
         name: Token,
         params: []const Token,
         body: *const Stmt,
-        closure: *Environment,
+        // closure: *Environment,
     },
     NativeFunction: struct {
         name: []const u8,

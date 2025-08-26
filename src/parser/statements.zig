@@ -10,17 +10,24 @@ const Stmt = lox.Stmt;
 const Token = lox.Token;
 const TokenType = lox.TokenType;
 
-const StatementParser = struct {
-    token_type: TokenType,
-    parser_fn: *const fn (*Parser) LoxError!*Stmt,
+const StatementParser = union(enum) {
+    simple: struct {
+        token_type: TokenType,
+        parser_fn: *const fn (*Parser) LoxError!*Stmt,
+    },
+    with_string: struct {
+        token_type: TokenType,
+        parser_fn: *const fn (*Parser, []const u8) LoxError!*Stmt,
+    },
 };
 
 const statement_parsers = [_]StatementParser{
-    .{ .token_type = .FOR, .parser_fn = forStatement },
-    .{ .token_type = .IF, .parser_fn = ifStatement },
-    .{ .token_type = .LEFT_BRACE, .parser_fn = blockStatement },
-    .{ .token_type = .PRINT, .parser_fn = printStatement },
-    .{ .token_type = .WHILE, .parser_fn = whileStatement },
+    .{ .simple = .{ .token_type = .IF, .parser_fn = ifStatement } },
+    .{ .simple = .{ .token_type = .LEFT_BRACE, .parser_fn = blockStatement } },
+    .{ .simple = .{ .token_type = .PRINT, .parser_fn = printStatement } },
+    .{ .simple = .{ .token_type = .WHILE, .parser_fn = whileStatement } },
+    .{ .simple = .{ .token_type = .FOR, .parser_fn = forStatement } },
+    .{ .with_string = .{ .token_type = .FUN, .parser_fn = functionStatement } },
 };
 
 pub fn program(p: *Parser) LoxError!*Stmt {
@@ -78,9 +85,19 @@ fn varDeclNoSemiColon(p: *Parser, id: Token) LoxError!*Stmt {
 fn statement(p: *Parser) LoxError!*Stmt {
     if (p.peek()) |token| {
         for (statement_parsers) |parser| {
-            if (token.type == parser.token_type) {
-                p.advance();
-                return parser.parser_fn(p);
+            switch (parser) {
+                .simple => |simple_parser| {
+                    if (token.type == simple_parser.token_type) {
+                        p.advance();
+                        return simple_parser.parser_fn(p);
+                    }
+                },
+                .with_string => |string_parser| {
+                    if (token.type == string_parser.token_type) {
+                        p.advance();
+                        return string_parser.parser_fn(p, "function"); // or whatever string you need
+                    }
+                },
             }
         }
     }
@@ -197,6 +214,54 @@ fn ifStatement(p: *Parser) LoxError!*Stmt {
         .then_branch = then_branch,
         .else_branch = else_branch,
     } });
+}
+
+fn functionStatement(p: *Parser, kind: []const u8) LoxError!*Stmt {
+    // TODO: Move to LoxError
+    const msg1 = try std.fmt.allocPrint(p.allocator, "Expect {s} name", .{kind});
+    const msg2 = try std.fmt.allocPrint(p.allocator, "Expect '(' after {s} name", .{kind});
+    const msg3 = try std.fmt.allocPrint(p.allocator, "Expect {{ before {s} body", .{kind});
+
+    const name = try p.expect(.IDENTIFIER, msg1);
+    _ = try p.expect(.LEFT_PAREN, msg2);
+
+    var params: ArrayList(Token) = .empty;
+    errdefer {
+        params.deinit(p.allocator);
+    }
+    while (true) {
+        if (p.check(.RIGHT_PAREN)) {
+            break;
+        }
+
+        if (params.items.len >= 255) {
+            p.parseError(
+                LoxError.TooManyArguments,
+                "Cannot have more than 255 parameters.",
+                p.previous() orelse p.source[p.current],
+            );
+            return LoxError.TooManyArguments; // TODO: rename/add TooManyParameters
+        }
+
+        const param = try p.expect(.IDENTIFIER, "Expect parameter name");
+        try params.append(p.allocator, param);
+
+        if (!p.check(.COMMA)) break;
+    }
+
+    _ = try p.expect(.RIGHT_PAREN, "Expect ')' after parameters");
+
+    _ = try p.expect(.LEFT_BRACE, msg3);
+    const body = try blockStatement(p);
+    std.debug.assert(std.meta.activeTag(body.*) == .Block);
+
+    return createStmt(p, .{
+        .Function = .{
+            .name = name,
+            .params = try params.toOwnedSlice(p.allocator),
+            .body = body.Block.statements,
+        },
+    });
 }
 
 fn printStatement(p: *Parser) LoxError!*Stmt {
