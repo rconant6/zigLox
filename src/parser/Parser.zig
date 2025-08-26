@@ -35,6 +35,8 @@ pub fn init(
     };
 }
 
+// TODO: Update to use labeled switch w/ states? see Tokenizer.zig from loris
+// TODO: Remove all pointers for Expr and Stmt: store AST in array, track idices
 pub fn parse(self: *Parser, tokens: []const Token) LoxError![]const Stmt {
     var statements: ArrayList(Stmt) = .empty;
     self.source = tokens;

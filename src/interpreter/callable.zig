@@ -65,7 +65,7 @@ pub const Callable = union(enum) {
     ) LoxError!RuntimeValue {
         const local_env = try interpreter.allocator.create(Environment);
         defer interpreter.allocator.destroy(local_env);
-        local_env.* = .createGlobalEnv(interpreter.allocator);
+        local_env.* = .createLocalEnv(interpreter.environment);
         const parent_env = interpreter.environment;
         interpreter.environment = local_env;
         defer interpreter.environment = parent_env;

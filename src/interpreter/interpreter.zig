@@ -58,8 +58,17 @@ pub const Interpreter = struct {
                 }
                 return for (b.statements) |s| {
                     self.execute(s.*) catch |err| {
-                        self.processRuntimeError(err, "RUNTIME ERROR in Block", b.loc);
-                        return err;
+                        switch (err) {
+                            LoxError.Return => return err,
+                            else => {
+                                self.processRuntimeError(
+                                    err,
+                                    "RUNTIME ERROR in Block",
+                                    b.loc,
+                                );
+                                return err;
+                            },
+                        }
                     };
                 };
             },
@@ -90,11 +99,14 @@ pub const Interpreter = struct {
                 try out_writer.print("{f}\n", .{value});
                 try out_writer.flush();
             },
-            // .Return => |r| {
-            //     const value = if (r.value) |val| try self.evalExpr(val) else RuntimeValue.Nil;
-            //     self.return_value = value;
-            //     return LoxError.Return; // "Throw" the return
-            // },
+            .Return => |r| {
+                const value = if (r.value) |val|
+                    try self.evalExpr(val)
+                else
+                    RuntimeValue.Nil;
+                self.return_value = value;
+                return LoxError.Return;
+            },
             .Variable => |v| {
                 const value = if (v.value) |val| try self.evalExpr(val) else RuntimeValue.Nil;
                 try self.environment.define(v.name.lexeme, value);

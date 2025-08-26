@@ -25,6 +25,10 @@ pub const Stmt = union(enum) {
     Print: ParseType(struct {
         value: *Expr,
     }),
+    Return: ParseType(struct {
+        keyword: Token,
+        value: ?*Expr,
+    }),
     Variable: ParseType(struct {
         name: Token,
         value: ?*Expr,
@@ -46,6 +50,7 @@ pub const Stmt = union(enum) {
             .Function => |f| try w.print("Function: {s}", .{f.name.lexeme}),
             .If => |i| try w.print("IfStmt: ({f})", .{i.condition}),
             .Print => |p| try w.print("PrintStmt: {f}", .{p.value}),
+            .Return => try w.print("RetrunStmt", .{}),
             .Variable => |v| try w.print("Variable: {s} = {}", .{ v.name.lexeme, v.value }),
             .While => |e| try w.print("WhileStmt: ({f})", .{e.condition}),
         }

@@ -62,7 +62,7 @@ pub fn scanTokens(self: *Scanner) ![]const Token {
 fn scanToken(self: *Scanner) !void {
     const c = self.advance();
     self.start_column = self.column - 1;
-
+// TODO: Update to use labeled switch w/ states? see Tokenizer.zig from loris
     switch (c) {
         ' ', '\r', '\t' => {},
         '\n' => self.newLine(),

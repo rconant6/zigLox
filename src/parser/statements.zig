@@ -22,11 +22,13 @@ const StatementParser = union(enum) {
 };
 
 const statement_parsers = [_]StatementParser{
+    .{ .simple = .{ .token_type = .FOR, .parser_fn = forStatement } },
     .{ .simple = .{ .token_type = .IF, .parser_fn = ifStatement } },
     .{ .simple = .{ .token_type = .LEFT_BRACE, .parser_fn = blockStatement } },
+    .{ .simple = .{ .token_type = .RETURN, .parser_fn = returnStatement } },
     .{ .simple = .{ .token_type = .PRINT, .parser_fn = printStatement } },
     .{ .simple = .{ .token_type = .WHILE, .parser_fn = whileStatement } },
-    .{ .simple = .{ .token_type = .FOR, .parser_fn = forStatement } },
+
     .{ .with_string = .{ .token_type = .FUN, .parser_fn = functionStatement } },
 };
 
@@ -279,6 +281,23 @@ fn printStatement(p: *Parser) LoxError!*Stmt {
     }
 
     return createStmt(p, .{ .Print = .{ .value = expr } });
+}
+
+fn returnStatement(p: *Parser) LoxError!*Stmt {
+    const keyword = p.previous() orelse unreachable; // can only get here /w .RETURN
+    // std.debug.assert(keyword.type == .RETURN);
+
+    const value = if (!p.check(.SEMICOLON))
+        try p.expression()
+    else
+        null;
+
+    _ = try p.expect(.SEMICOLON, "Return statements expect ';' at end");
+
+    return createStmt(p, .{ .Return = .{
+        .keyword = keyword,
+        .value = value,
+    } });
 }
 
 fn whileStatement(p: *Parser) LoxError!*Stmt {
