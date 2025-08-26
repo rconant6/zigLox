@@ -1,4 +1,5 @@
 const std = @import("std");
+const ArrayList = std.ArrayList;
 
 const lox = @import("../lox.zig");
 const Expr = lox.Expr;
@@ -77,9 +78,54 @@ pub fn unary(p: *Parser) LoxError!*Expr {
 }
 
 pub fn call(p: *Parser) LoxError!*Expr {
-    const expr = primary(p); // callee
+    var expr = try primary(p);
+
+    while (p.match(&.{.LEFT_PAREN})) |_| {
+        const args = try parseArguments(p);
+        errdefer {
+            for (args) |arg| p.freeExpr(arg);
+            p.allocator.free(args);
+        }
+
+        const paren = try p.expect(.RIGHT_PAREN, "Expected ')' after arguments");
+        expr = try createExpr(p, .{ .Call = .{
+            .callee = expr,
+            .paren = paren,
+            .args = args,
+        } });
+    }
 
     return expr;
+}
+
+fn parseArguments(p: *Parser) LoxError![]const *Expr {
+    var arguments: ArrayList(*Expr) = .empty;
+    errdefer {
+        for (arguments.items) |arg| p.freeExpr(arg);
+        arguments.deinit(p.allocator);
+    }
+
+    if (p.check(.RIGHT_PAREN)) {
+        return arguments.toOwnedSlice(p.allocator);
+    }
+
+    while (true) {
+        if (arguments.items.len >= 255) {
+            p.parseError(
+                LoxError.TooManyArguments,
+                "Cannot have more than 255 arguments.",
+                p.previous() orelse p.source[p.current],
+            );
+            return LoxError.TooManyArguments;
+        }
+
+        const arg = try expression(p);
+        try arguments.append(p.allocator, arg);
+
+        if (!p.check(.COMMA)) break;
+    }
+
+    return arguments.toOwnedSlice(p.allocator);
 }
 
 pub fn primary(p: *Parser) LoxError!*Expr {

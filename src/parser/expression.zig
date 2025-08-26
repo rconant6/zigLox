@@ -29,11 +29,11 @@ pub const Expr = union(enum) {
         op: Token,
         right: *Expr,
     }),
-    // Call: ParseType(struct {
-    //     calee: *Expr,
-    //     paren: Token,
-    //     args: []*Expr,
-    // }),
+    Call: ParseType(struct {
+        callee: *Expr,
+        paren: Token,
+        args: []const *Expr,
+    }),
     Group: ParseType(struct {
         expr: *Expr,
     }),
@@ -62,6 +62,7 @@ pub const Expr = union(enum) {
                     .{ b.left, b.op.lexeme, b.right },
                 );
             },
+            .Call => |c| try w.print("Call: {f} argsLen: {d}", .{ c.callee, c.args.len }),
             .Group => |g| try w.print("Grouping: ({f})", .{g.expr}),
             .Literal => |l| try w.print("{f}", .{l.value}),
             .Logical => |l| try w.print("xx  {s}  yy", .{l.op.lexeme}),

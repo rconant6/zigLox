@@ -1,6 +1,9 @@
 const std = @import("std");
+const ArrayList = std.ArrayList;
+
 const lox = @import("../lox.zig");
 const out_writer = lox.out_writer;
+const Callable = lox.Callable;
 const DiagnosticReporter = lox.DiagnosticReporter;
 const Environment = lox.Environment;
 const ErrorContext = lox.ErrorContext;
@@ -14,6 +17,7 @@ pub const Interpreter = struct {
     allocator: std.mem.Allocator,
     diagnostics: *DiagnosticReporter,
     environment: *Environment,
+    return_value: ?RuntimeValue = null,
 
     pub fn init(
         gpa: std.mem.Allocator,
@@ -33,7 +37,7 @@ pub const Interpreter = struct {
         }
     }
 
-    fn execute(self: *Interpreter, stmt: Stmt) LoxError!void {
+    pub fn execute(self: *Interpreter, stmt: Stmt) LoxError!void {
         switch (stmt) {
             .Block => |b| {
                 const outer_env = self.environment;
@@ -63,9 +67,14 @@ pub const Interpreter = struct {
             },
             .Print => |p| {
                 const value = try self.evalExpr(p.value);
-                try out_writer.print("{f}\n", .{value});
+                try out_writer.print("{any}\n", .{value});
                 try out_writer.flush();
             },
+            // .Return => |r| {
+            //     const value = if (r.value) |val| try self.evalExpr(val) else RuntimeValue.Nil;
+            //     self.return_value = value;
+            //     return LoxError.Return; // "Throw" the return
+            // },
             .Variable => |v| {
                 const value = if (v.value) |val| try self.evalExpr(val) else RuntimeValue.Nil;
                 try self.environment.define(v.name.lexeme, value);
@@ -92,6 +101,38 @@ pub const Interpreter = struct {
                 const right = try self.evalExpr(b.right);
                 const left = try self.evalExpr(b.left);
                 return try evalBinary(self, b.op, left, right);
+            },
+            .Call => |c| {
+                const callee = try self.evalExpr(c.callee);
+
+                var arguments: ArrayList(RuntimeValue) = .empty;
+                defer arguments.deinit(self.allocator);
+                for (c.args) |arg| {
+                    const arg_value = try self.evalExpr(arg);
+                    try arguments.append(self.allocator, arg_value);
+                }
+
+                switch (callee) {
+                    .Callable => |callable| {
+                        if (arguments.items.len != callable.arity()) {
+                            self.processRuntimeError(
+                                LoxError.WrongNumberOfArguments,
+                                "Wrong number of arguments",
+                                c.paren,
+                            );
+                            return LoxError.WrongNumberOfArguments;
+                        }
+                        return callable.call(self, arguments.items);
+                    },
+                    else => {
+                        self.processRuntimeError(
+                            LoxError.NotCallable,
+                            "Only functions and classes are callable",
+                            c.paren,
+                        );
+                        return LoxError.NotCallable;
+                    },
+                }
             },
             .Group => |g| return try self.evalExpr(g.expr),
             .Literal => |l| return switch (l.value) {

@@ -4,6 +4,7 @@ const intp = @import("interpreter/interpreter.zig");
 const lerr = @import("loxError.zig");
 const tok = @import("scanner/token.zig");
 const stmt = @import("parser/statement.zig");
+pub const Callable = @import("interpreter/callable.zig").Callable;
 pub const DiagnosticReporter = @import("DiagnoticReporter.zig");
 pub const Environment = @import("interpreter/Environment.zig");
 pub const ErrorContext = lerr.ErrorContext;
@@ -22,6 +23,7 @@ pub const RuntimeValue = union(enum) {
     Nil: void,
     Number: f64,
     String: []const u8,
+    Callable: Callable,
 
     pub fn isEqual(self: RuntimeValue, other: RuntimeValue) bool {
         std.debug.assert(std.meta.activeTag(self) == std.meta.activeTag(other));
@@ -31,6 +33,7 @@ pub const RuntimeValue = union(enum) {
             .Nil => true,
             .Number => |n| n == other.Number,
             .String => |s| std.mem.eql(u8, s, other.String),
+            .Callable => false,
         };
     }
 
@@ -47,6 +50,12 @@ pub const RuntimeValue = union(enum) {
             .Nil => w.print("NIL", .{}),
             .Number => |n| w.print("{d}", .{n}),
             .String => |s| w.print("{s}", .{s}),
+            .Callable => |c| {
+                try switch (c) {
+                    .Function => |f| w.print("Callable: {s}", .{f.name}),
+                    .NativeFunction => |n| w.print("NativeCallable: {s}", n.name),
+                };
+            },
         };
     }
 };
