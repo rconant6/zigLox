@@ -2,7 +2,7 @@ const std = @import("std");
 const exp = @import("parser/expression.zig");
 const intp = @import("interpreter/interpreter.zig");
 const lerr = @import("loxError.zig");
-const tok = @import("scanner/token.zig");
+const tok = @import("scanner/tokenizer.zig");
 const stmt = @import("parser/statement.zig");
 pub const Callable = @import("interpreter/callable.zig").Callable;
 pub const DiagnosticReporter = @import("DiagnoticReporter.zig");
@@ -13,10 +13,9 @@ pub const ExprValue = exp.ExprValue;
 pub const Interpreter = intp.Interpreter;
 pub const LoxError = lerr.LoxError;
 pub const Parser = @import("parser/Parser.zig");
-pub const Scanner = @import("scanner/Scanner.zig");
+pub const Tokenizer = tok.Tokenizer;
 pub const Stmt = stmt.Stmt;
 pub const Token = tok.Token;
-pub const TokenType = tok.TokenType;
 
 pub const RuntimeValue = union(enum) {
     Bool: bool,

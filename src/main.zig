@@ -1,11 +1,11 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
+const ArrayList = std.ArrayList;
+const DebugAllocator = std.heap.DebugAllocator;
+const DebugAllocatorConfig = std.heap.DebugAllocatorConfig;
 const lox = @import("lox.zig");
-const DiagnosticReporter = lox.DiagnosticReporter;
-const Environment = lox.Environment;
-const Interpreter = lox.Interpreter;
-const Parser = lox.Parser;
-const Scanner = lox.Scanner;
 const Token = lox.Token;
+const Tokenizer = lox.Tokenizer;
 
 const out_writer = lox.out_writer;
 const err_writer = lox.err_writer;
@@ -15,7 +15,9 @@ const lex_parse_err = 65;
 const runtime_err = 70;
 
 pub fn main() !void {
-    const allocator = std.heap.page_allocator;
+    var gpa = std.heap.DebugAllocator(DebugAllocatorConfig{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
 
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
@@ -35,10 +37,12 @@ pub fn main() !void {
 
 fn runFromPrompt(gpa: std.mem.Allocator) anyerror!void {
     try out_writer.print("ZLox REPL - Welcome! type 'exit' to quit\n", .{});
+    var history: ArrayList([]const u8) = .empty;
+    defer history.deinit(gpa);
 
-    const global_env = try gpa.create(Environment);
-    defer gpa.destroy(global_env);
-    global_env.* = .createGlobalEnv(gpa);
+    // const global_env = try gpa.create(Environment);
+    // defer gpa.destroy(global_env);
+    // global_env.* = .createGlobalEnv(gpa);
 
     while (true) {
         try out_writer.print("zlox> ", .{});
@@ -55,10 +59,12 @@ fn runFromPrompt(gpa: std.mem.Allocator) anyerror!void {
         };
 
         const trimmed = std.mem.trim(u8, line, " \t\r\n");
+        try history.append(gpa, trimmed);
 
         if (std.mem.eql(u8, trimmed, "exit")) break;
 
-        _ = processData(gpa, trimmed, global_env) catch |err| {
+        // _ = processData(gpa, trimmed, global_env) catch |err| {
+        _ = processData(gpa, trimmed) catch |err| {
             try err_writer.print("ERROR: {any}\n", .{err});
             try err_writer.flush();
         };
@@ -85,60 +91,63 @@ fn runFromFile(gpa: std.mem.Allocator, file_name: []const u8) !void {
     const bytes = try file.readAll(data);
     std.debug.assert(bytes == stats.size);
 
-    const global_env = try gpa.create(Environment);
-    defer gpa.destroy(global_env);
-    global_env.* = .createGlobalEnv(gpa);
+    // const global_env = try gpa.create(Environment);
+    // defer gpa.destroy(global_env);
+    // global_env.* = .createGlobalEnv(gpa);
 
-    const return_val = try processData(gpa, data, global_env);
+    // const return_val = try processData(gpa, data, global_env);
+    const return_val = try processData(gpa, data);
     std.process.exit(return_val);
 }
 
-fn processData(gpa: std.mem.Allocator, data: []const u8, env: *Environment) !u8 {
-    var diagnostics: DiagnosticReporter = .init(gpa);
+// fn processData(gpa: std.mem.Allocator, data: []const u8, env: *Environment) !u8 {
+fn processData(gpa: std.mem.Allocator, data: []const u8) !u8 {
+    // var diagnostics: DiagnosticReporter = .init(gpa);
 
-    var scanner: Scanner = try .init(gpa, data, &diagnostics);
-    var parser: Parser = .init(gpa, &diagnostics);
-    var interpreter: Interpreter = try .init(gpa, &diagnostics, env);
+    var scanner: Tokenizer = .init();
+    // var parser: Parser = .init(gpa, &diagnostics);
+    // var interpreter: Interpreter = try .init(gpa, &diagnostics, env);
 
-    const tokens = scanner.scanTokens() catch {
+    const tokens = scanner.scanTokens(gpa, data) catch {
         std.log.err("Lexing Complete with Error(s)", .{});
-        if (diagnostics.hasErrors()) {
-            try diagnostics.printDiagnostics(err_writer);
-        }
+        // if (diagnostics.hasErrors()) {
+        // try diagnostics.printDiagnostics(err_writer);
+        // }
         return lex_parse_err;
     };
+    defer gpa.destroy(&tokens);
 
     if (tokens.len <= 1) return 0;
-    diagnostics.clearErrors();
+    // diagnostics.clearErrors();
     std.log.info("Lexing Complete with {d} tokens", .{tokens.len});
     // for (tokens) |token| {
-    //     std.log.debug("{f}", .{token});
+    // std.log.debug("{f}", .{token.format(err_writer, data)});
     // }
 
-    const statements = parser.parse(tokens) catch {
-        std.log.err("Parsing Complete with Error(s)", .{});
-        if (diagnostics.hasErrors()) {
-            try diagnostics.printDiagnostics(err_writer);
-        }
-        return lex_parse_err;
-    };
+    // const statements = parser.parse(tokens) catch {
+    //     std.log.err("Parsing Complete with Error(s)", .{});
+    //     if (diagnostics.hasErrors()) {
+    //         try diagnostics.printDiagnostics(err_writer);
+    //     }
+    //     return lex_parse_err;
+    // };
 
-    if (statements.len == 0) return 0;
-    std.log.info("Parsing complete", .{});
-    diagnostics.clearErrors();
+    // if (statements.len == 0) return 0;
+    // std.log.info("Parsing complete", .{});
+    // diagnostics.clearErrors();
 
-    _ = interpreter.interpret(statements) catch |err| {
-        std.log.err("Runtime exited with error {}", .{err});
-        if (diagnostics.hasErrors()) {
-            try diagnostics.printDiagnostics(err_writer);
-        }
-        return lex_parse_err;
-    };
+    // _ = interpreter.interpret(statements) catch |err| {
+    //     std.log.err("Runtime exited with error {}", .{err});
+    //     if (diagnostics.hasErrors()) {
+    //         try diagnostics.printDiagnostics(err_writer);
+    //     }
+    //     return lex_parse_err;
+    // };
 
-    if (diagnostics.hasErrors()) {
-        try diagnostics.printDiagnostics(err_writer);
-        return runtime_err;
-    }
+    // if (diagnostics.hasErrors()) {
+    //     try diagnostics.printDiagnostics(err_writer);
+    //     return runtime_err;
+    // }
 
     return 0;
 }
