@@ -8,6 +8,16 @@ const RuntimeValue = lox.RuntimeValue;
 const Stmt = lox.Stmt;
 const Token = lox.Token;
 
+const NativeFnImpl = struct {
+    arity: usize,
+    callFn: *const fn (*Interpreter, []const RuntimeValue) LoxError!RuntimeValue,
+};
+
+const NATIVE_FUNCTIONS = std.StaticStringMap(NativeFnImpl).initComptime(.{
+    .{ "clock", NativeFnImpl{ .arity = 0, .callFn = clockImpl } },
+    // .{ "print", NativeFnImpl{ .arity = 1, .callFn = printImpl } },
+});
+
 pub const Callable = union(enum) {
     Function: struct {
         name: Token,
@@ -17,11 +27,6 @@ pub const Callable = union(enum) {
     },
     NativeFunction: struct {
         name: []const u8,
-        arity: usize,
-        callFn: *const fn (
-            *Interpreter,
-            arguments: []const RuntimeValue,
-        ) LoxError!RuntimeValue,
     },
 
     pub fn call(
@@ -31,14 +36,24 @@ pub const Callable = union(enum) {
     ) LoxError!RuntimeValue {
         switch (self) {
             .Function => |func| return self.callFunction(func, interpreter, arguments),
-            .NativeFunction => |native| return native.callFn(interpreter, arguments),
+            .NativeFunction => |native| {
+                const impl = NATIVE_FUNCTIONS.get(native.name) orelse return .Nil;
+                return impl.callFn(interpreter, arguments);
+            },
         }
     }
 
     pub fn arity(self: Callable) usize {
         switch (self) {
             .Function => |func| return func.params.len,
-            .NativeFunction => |native| return native.arity,
+            .NativeFunction => |native| return NATIVE_FUNCTIONS.get(native.name).?.arity,
+        }
+    }
+
+    pub fn getName(self: Callable) []const u8 {
+        switch (self) {
+            .Function => |func| return func.name.lexeme,
+            .NativeFunction => |native| return native.name,
         }
     }
 
@@ -70,11 +85,12 @@ pub const Callable = union(enum) {
 
         return RuntimeValue.Nil;
     }
-
-    pub fn getName(self: Callable) []const u8 {
-        switch (self) {
-            .Function => |func| return func.name.lexeme,
-            .NativeFunction => |native| return native.name,
-        }
-    }
 };
+
+// MARK: BUILTIN FUNCTIONS
+fn clockImpl(interpreter: *Interpreter, arguments: []const RuntimeValue) LoxError!RuntimeValue {
+    _ = interpreter;
+    _ = arguments;
+    const now: f64 = @floatFromInt(std.time.milliTimestamp());
+    return RuntimeValue{ .Number = now };
+}

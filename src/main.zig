@@ -98,7 +98,7 @@ fn processData(gpa: std.mem.Allocator, data: []const u8, env: *Environment) !u8 
 
     var scanner: Scanner = try .init(gpa, data, &diagnostics);
     var parser: Parser = .init(gpa, &diagnostics);
-    var interpreter: Interpreter = .init(gpa, &diagnostics, env);
+    var interpreter: Interpreter = try .init(gpa, &diagnostics, env);
 
     const tokens = scanner.scanTokens() catch {
         std.log.err("Lexing Complete with Error(s)", .{});

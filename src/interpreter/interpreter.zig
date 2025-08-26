@@ -23,7 +23,15 @@ pub const Interpreter = struct {
         gpa: std.mem.Allocator,
         diagnostic: *DiagnosticReporter,
         env: *Environment,
-    ) Interpreter {
+    ) !Interpreter {
+        const clock_native = try gpa.create(RuntimeValue);
+        clock_native.* = .{
+            .Callable = .{ .NativeFunction = .{
+                .name = "clock",
+            } },
+        };
+        try env.define("clock", clock_native.*);
+
         return .{
             .allocator = gpa,
             .diagnostics = diagnostic,
@@ -67,7 +75,7 @@ pub const Interpreter = struct {
             },
             .Print => |p| {
                 const value = try self.evalExpr(p.value);
-                try out_writer.print("{any}\n", .{value});
+                try out_writer.print("{f}\n", .{value});
                 try out_writer.flush();
             },
             // .Return => |r| {

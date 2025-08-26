@@ -50,12 +50,7 @@ pub const RuntimeValue = union(enum) {
             .Nil => w.print("NIL", .{}),
             .Number => |n| w.print("{d}", .{n}),
             .String => |s| w.print("{s}", .{s}),
-            .Callable => |c| {
-                try switch (c) {
-                    .Function => |f| w.print("Callable: {s}", .{f.name}),
-                    .NativeFunction => |n| w.print("NativeCallable: {s}", n.name),
-                };
-            },
+            .Callable => |c| w.print("{s}", .{c.getName()}),
         };
     }
 };
