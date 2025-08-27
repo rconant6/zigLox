@@ -4,6 +4,7 @@ const ArrayList = std.ArrayList;
 const DebugAllocator = std.heap.DebugAllocator;
 const DebugAllocatorConfig = std.heap.DebugAllocatorConfig;
 const lox = @import("lox.zig");
+const DiagnosticReporter = lox.DiagnosticReporter;
 const Token = lox.Token;
 const Tokenizer = lox.Tokenizer;
 
@@ -102,17 +103,16 @@ fn runFromFile(gpa: std.mem.Allocator, file_name: []const u8) !void {
 
 // fn processData(gpa: std.mem.Allocator, data: []const u8, env: *Environment) !u8 {
 fn processData(gpa: std.mem.Allocator, data: []const u8) !u8 {
-    // var diagnostics: DiagnosticReporter = .init(gpa);
+    var diagnostics: DiagnosticReporter = .init(gpa);
+    defer diagnostics.deinit();
 
     var scanner: Tokenizer = .init();
-    // var parser: Parser = .init(gpa, &diagnostics);
-    // var interpreter: Interpreter = try .init(gpa, &diagnostics, env);
-
-    const tokens = scanner.scanTokens(gpa, data) catch {
-        std.log.err("Lexing Complete with Error(s)", .{});
-        // if (diagnostics.hasErrors()) {
-        // try diagnostics.printDiagnostics(err_writer);
-        // }
+    std.log.debug("DiagCount: {d}", .{diagnostics.errors.items.len});
+    const tokens = scanner.scanTokens(gpa, data, &diagnostics) catch {
+        if (diagnostics.hasErrors()) {
+            std.log.err("Lexing Complete with Error(s)", .{});
+            try diagnostics.printDiagnostics(err_writer);
+        }
         return lex_parse_err;
     };
     defer gpa.free(tokens);
@@ -124,6 +124,7 @@ fn processData(gpa: std.mem.Allocator, data: []const u8) !u8 {
     // std.log.debug("{f} {s}", .{ token, token.lexeme(data) });
     // }
 
+    // var parser: Parser = .init(gpa, &diagnostics);
     // const statements = parser.parse(tokens) catch {
     //     std.log.err("Parsing Complete with Error(s)", .{});
     //     if (diagnostics.hasErrors()) {
@@ -136,6 +137,7 @@ fn processData(gpa: std.mem.Allocator, data: []const u8) !u8 {
     // std.log.info("Parsing complete", .{});
     // diagnostics.clearErrors();
 
+    // var interpreter: Interpreter = try .init(gpa, &diagnostics, env);
     // _ = interpreter.interpret(statements) catch |err| {
     //     std.log.err("Runtime exited with error {}", .{err});
     //     if (diagnostics.hasErrors()) {

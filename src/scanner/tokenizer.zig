@@ -2,7 +2,10 @@ const std = @import("std");
 const ArrayList = std.ArrayList;
 const Allocator = std.mem.Allocator;
 const lox = @import("../lox.zig");
+const DiagnosticReporter = lox.DiagnosticReporter;
+const ErrorContext = lox.ErrorContext;
 const LiteralValue = lox.LiteralValue;
+const LoxError = lox.LoxError;
 
 pub const Token = struct {
     tag: Tag,
@@ -223,7 +226,12 @@ pub const Tokenizer = struct {
         end,
     };
 
-    pub fn scanTokens(self: *Tokenizer, gpa: Allocator, src: []const u8) ![]Token {
+    pub fn scanTokens(
+        self: *Tokenizer,
+        gpa: Allocator,
+        src: []const u8,
+        diagnostic: *DiagnosticReporter,
+    ) ![]Token {
         var tokens: ArrayList(Token) = .empty;
         var tok: Token = .{
             .tag = .Invalid,
@@ -294,11 +302,15 @@ pub const Tokenizer = struct {
                 },
                 // Invalid character
                 else => {
-                    self.advance();
+                    self.singleCharToken(&tok, .Invalid);
+                    const ctx: ErrorContext = .init(
+                        "Invalid character",
+                        LoxError.UnRecognizedCharacter,
+                    );
+                    diagnostic.reportError(ctx.withToken(tok));
                     continue :start self.char(src);
                 },
             },
-
             .comment => comment: switch (self.char(src)) {
                 0 => {
                     // EOF - add EOF token and finish
@@ -313,6 +325,7 @@ pub const Tokenizer = struct {
                     continue :state .start;
                 },
                 else => {
+                    // self.singleCharToken(&tok, .Invalid);
                     self.advance();
                     continue :comment self.char(src);
                 },
@@ -322,7 +335,11 @@ pub const Tokenizer = struct {
                     // Unterminated string - invalid token and EOF
                     self.endToken(&tok);
                     tok.tag = .Invalid;
-                    try tokens.append(gpa, tok);
+                    const ctx: ErrorContext = .init(
+                        "Unterminated string",
+                        LoxError.UnterminatedString,
+                    );
+                    diagnostic.reportError(ctx.withToken(tok));
 
                     tok.tag = .Eof;
                     self.startToken(&tok);
@@ -400,6 +417,10 @@ pub const Tokenizer = struct {
             .end => {
                 for (tokens.items) |token| {
                     std.debug.print("{f} {s}\n", .{ token, token.lexeme(src) });
+                }
+                if (diagnostic.hasErrors()) {
+                    tokens.deinit(gpa);
+                    return LoxError.LexingError;
                 }
                 return tokens.toOwnedSlice(gpa);
             },
