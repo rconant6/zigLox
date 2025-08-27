@@ -115,13 +115,13 @@ fn processData(gpa: std.mem.Allocator, data: []const u8) !u8 {
         // }
         return lex_parse_err;
     };
-    defer gpa.destroy(&tokens);
+    defer gpa.free(tokens);
 
     if (tokens.len <= 1) return 0;
     // diagnostics.clearErrors();
     std.log.info("Lexing Complete with {d} tokens", .{tokens.len});
     // for (tokens) |token| {
-    // std.log.debug("{f}", .{token.format(err_writer, data)});
+    // std.log.debug("{f} {s}", .{ token, token.lexeme(data) });
     // }
 
     // const statements = parser.parse(tokens) catch {
