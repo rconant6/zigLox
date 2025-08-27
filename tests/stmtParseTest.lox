@@ -1,0 +1,168 @@
+// Variable declarations
+var x;
+var y = 42;
+var name = "Alice";
+var flag = true;
+var result = nil;
+var pi = 3.14159;
+var _private = "hidden";
+var counter = 0;
+
+// Expression statements
+42;
+3.14 + 2.86;
+"hello" + " " + "world";
+x = 10;
+y = x + 5;
+name = "Bob";
+flag = !flag;
+counter = counter + 1;
+x * y - 10;
+(x + y) * 2;
+
+// Print statements
+print "Hello, World!";
+print x;
+print x + y;
+print "The result is: " + "calculated";
+print true;
+print nil;
+print 42 * 2;
+print (x > y);
+
+// Block statements
+{
+    var local = 100;
+    print local;
+}
+
+{
+    var a = 1;
+    var b = 2;
+    print a + b;
+    {
+        var c = 3;
+        print a + b + c;
+    }
+}
+
+{
+    print "nested";
+    {
+        print "blocks";
+        {
+            print "work";
+        }
+    }
+}
+
+// If statements
+if (true) print "always executes";
+
+if (x > 0) {
+    print "x is positive";
+}
+
+if (x > y) {
+    print "x is greater";
+} else {
+    print "y is greater or equal";
+}
+
+if (x > 10) {
+    print "large";
+} else if (x > 5) {
+    print "medium";
+} else {
+    print "small";
+}
+
+// While statements
+while (false) {
+    print "never executes";
+}
+
+var i = 0;
+while (i < 3) {
+    print i;
+    i = i + 1;
+}
+
+var done = false;
+while (!done) {
+    print "once";
+    done = true;
+}
+
+// For statements
+for (var j = 0; j < 3; j = j + 1) {
+    print j;
+}
+
+for (var k = 10; k > 0; k = k - 1) {
+    print "countdown: " + k;
+}
+
+for (var m = 0; m < 2; m = m + 1) {
+    for (var n = 0; n < 2; n = n + 1) {
+        print "nested: " + m + "," + n;
+    }
+}
+
+// Complex nested statements
+if (x > 0) {
+    var temp = x;
+    while (temp > 0) {
+        print temp;
+        temp = temp - 1;
+    }
+} else {
+    for (var idx = 0; idx < 5; idx = idx + 1) {
+        if (idx == 2) {
+            print "middle";
+        } else {
+            print idx;
+        }
+    }
+}
+
+// Mixed statement types
+{
+    var total = 0;
+    for (var num = 1; num <= 5; num = num + 1) {
+        total = total + num;
+        if (total > 10) {
+            print "total exceeded 10";
+        }
+    }
+    print "final total: ";
+    print total;
+}
+
+// Logical expressions in control flow
+if (true and false) {
+    print "never";
+} else if (true or false) {
+    print "always";
+}
+
+while (x > 0 and x < 100) {
+    x = x + 10;
+    print x;
+}
+
+// Variable shadowing in blocks
+var scope_test = "outer";
+{
+    var scope_test = "inner";
+    print scope_test;
+    {
+        var scope_test = "innermost";
+        print scope_test;
+    }
+    print scope_test;
+}
+print scope_test;
+
+print "test there is no semi-colon"
+print var ;

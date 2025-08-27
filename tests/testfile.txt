@@ -1,0 +1,72 @@
+(
+)
+[
+]
+,
+;
+.
+*
+-
++
+"lets test a string"
+
+"lets test a multi-
+line string"
+/
+abcd1234 // should be a id and number
+Z
+0
+> >=
+= ==
+! !=  ts
+< <=
+
+x = y;
+
+(())[];
+!*+-/=<> <= == // operators
+
+// this is a test comment
+
+"one"
+"one two"
+"one two three"
+"one two three four"
+
+"multi-
+line string"
+
+"back to single-line"
+
+1
+12
+123
+1234
+12345
+1.2
+1.23
+1234.1234
+.1234
+1234.
+
+and
+class
+else
+false
+for
+fun
+if
+nil
+or
+print
+return
+super
+this
+true
+var
+while
+
+a
+abc
+asdfasdf
+_leading

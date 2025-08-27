@@ -1,0 +1,109 @@
+// Primary expressions - literals
+42
+3.14159
+true
+false
+nil
+"hello world"
+"multi-line
+string literal"
+identifier
+variable_name
+_underscore_var
+
+// Grouping expressions
+(42)
+(true)
+("grouped string")
+(variable)
+((nested))
+(((deeply_nested)))
+
+// Unary expressions
+!true
+!false
+!nil
+!variable
+-42
+-3.14
+-variable
+!!double_negation
+--negative_negative
+!-mixed_unary
+
+// Binary arithmetic
+1 + 2
+10 - 5
+3 * 4
+15 / 3
+2.5 + 3.7
+100 - 25.5
+4.2 * 1.5
+9.6 / 2.4
+
+// Binary comparison  
+5 > 3
+10 < 20
+7 >= 7
+8 <= 12
+15 == 15
+9 != 10
+3.14 > 2.71
+"abc" == "abc"
+"hello" != "world"
+
+// Binary logical
+true and false
+true or false
+false and true
+false or true
+nil and true
+"hello" or nil
+
+// Complex nested expressions
+1 + 2 * 3
+(1 + 2) * 3
+4 - 2 + 1
+10 / 2 / 5
+2 * 3 + 4 * 5
+(2 + 3) * (4 - 1)
+!true and false
+true or !false
+!(true and false)
+(true or false) and true
+
+// Chained comparisons
+1 < 2
+5 > 4
+10 >= 5
+x == y
+a < b
+
+// Mixed types and complex nesting
+(1 + 2) == 3
+"hello" + "world"
+!(5 > 3) or (2 < 4)
+(true and !false) or (nil == nil)
+((1 + 2) * 3) - ((4 / 2) + 1)
+!((5 >= 5) and ("test" != nil))
+
+// Variable references and operations
+x + y
+first_name == last_name
+!is_valid
+-counter
+balance > 0
+name != ""
+(age >= 18) and (age <= 65)
+
+// Deeply nested grouping
+(((((1)))))
+((1 + 2) + (3 + 4))
+(((x * y) + (a * b)) - ((c / d) * (e + f)))
+
+// All operators mixed
+1 + 2 - 3 * 4 / 5
+6 < 7
+8 >= 9
+10 == 11
+12 != 13 and true or false
