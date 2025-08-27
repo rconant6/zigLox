@@ -5,6 +5,7 @@ const DebugAllocator = std.heap.DebugAllocator;
 const DebugAllocatorConfig = std.heap.DebugAllocatorConfig;
 const lox = @import("lox.zig");
 const DiagnosticReporter = lox.DiagnosticReporter;
+const Parser = lox.Parser;
 const Token = lox.Token;
 const Tokenizer = lox.Tokenizer;
 
@@ -107,10 +108,12 @@ fn processData(gpa: std.mem.Allocator, data: []const u8) !u8 {
     defer diagnostics.deinit();
 
     var scanner: Tokenizer = .init();
-    std.log.debug("DiagCount: {d}", .{diagnostics.errors.items.len});
     const tokens = scanner.scanTokens(gpa, data, &diagnostics) catch {
         if (diagnostics.hasErrors()) {
-            std.log.err("Lexing Complete with Error(s)", .{});
+            std.log.err(
+                "FAILURE: Lexing failed with {d} Error(s)",
+                .{diagnostics.errors.items.len},
+            );
             try diagnostics.printDiagnostics(err_writer);
         }
         return lex_parse_err;
@@ -118,24 +121,24 @@ fn processData(gpa: std.mem.Allocator, data: []const u8) !u8 {
     defer gpa.free(tokens);
 
     if (tokens.len <= 1) return 0;
-    // diagnostics.clearErrors();
-    std.log.info("Lexing Complete with {d} tokens", .{tokens.len});
-    // for (tokens) |token| {
-    // std.log.debug("{f} {s}", .{ token, token.lexeme(data) });
-    // }
+    std.log.info("SUCCESS:  Lexing Complete with {d} tokens", .{tokens.len});
 
-    // var parser: Parser = .init(gpa, &diagnostics);
+    var parser: Parser = .init(gpa, &diagnostics, tokens, data);
+    defer parser.deinit();
     // const statements = parser.parse(tokens) catch {
-    //     std.log.err("Parsing Complete with Error(s)", .{});
-    //     if (diagnostics.hasErrors()) {
-    //         try diagnostics.printDiagnostics(err_writer);
-    //     }
-    //     return lex_parse_err;
-    // };
+    const stmt = parser.parse(tokens) catch {
+        std.log.err(
+            "FAILURE: Parsing failed with {d} Error(s)",
+            .{diagnostics.errors.items.len},
+        );
+        if (diagnostics.hasErrors()) {
+            try diagnostics.printDiagnostics(err_writer);
+        }
+        return lex_parse_err;
+    };
+    _ = stmt;
 
-    // if (statements.len == 0) return 0;
-    // std.log.info("Parsing complete", .{});
-    // diagnostics.clearErrors();
+    std.log.info("SUCCESS:  Parsing Complete", .{});
 
     // var interpreter: Interpreter = try .init(gpa, &diagnostics, env);
     // _ = interpreter.interpret(statements) catch |err| {

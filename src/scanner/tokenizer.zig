@@ -48,7 +48,7 @@ pub const Token = struct {
         );
     }
 
-    const Tag = enum {
+    pub const Tag = enum {
         // Single-character tokens.
         LeftParen,
         RightParen,
