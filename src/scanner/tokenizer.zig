@@ -34,12 +34,18 @@ pub const Token = struct {
         };
     }
 
-    pub fn format(self: Token, w: *std.Io.Writer) !void {
-        try w.print("Token: {t:13} Loc: {f} Src: {f}", .{
-            self.tag,
-            self.loc,
+    pub fn error_format(self: Token, w: *std.Io.Writer) !void {
+        try w.print("at: {f}   type: {t:13}", .{
             self.src_loc,
+            self.tag,
         });
+    }
+
+    pub fn format(self: Token, w: *std.Io.Writer) !void {
+        try w.print(
+            "TOKEN: {t:13} Src: {f}, Data: {f}",
+            .{ self.tag, self.src_loc, self.loc },
+        );
     }
 
     const Tag = enum {
@@ -306,8 +312,9 @@ pub const Tokenizer = struct {
                     const ctx: ErrorContext = .init(
                         "Invalid character",
                         LoxError.UnRecognizedCharacter,
+                        tok,
                     );
-                    diagnostic.reportError(ctx.withToken(tok));
+                    diagnostic.reportError(ctx);
                     continue :start self.char(src);
                 },
             },
@@ -338,8 +345,9 @@ pub const Tokenizer = struct {
                     const ctx: ErrorContext = .init(
                         "Unterminated string",
                         LoxError.UnterminatedString,
+                        tok,
                     );
-                    diagnostic.reportError(ctx.withToken(tok));
+                    diagnostic.reportError(ctx);
 
                     tok.tag = .Eof;
                     self.startToken(&tok);
@@ -399,7 +407,6 @@ pub const Tokenizer = struct {
                     continue :state .start;
                 },
             },
-
             .number_after_dot => after_dot: switch (self.char(src)) {
                 '0'...'9' => {
                     self.advance();

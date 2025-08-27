@@ -47,18 +47,14 @@ pub const ErrorContext = struct {
     sourceCode: ?[]const u8 = null,
     errorType: LoxError,
 
-    pub fn init(message: []const u8, errType: LoxError) ErrorContext {
+    pub fn init(message: []const u8, errType: LoxError, token: ?Token) ErrorContext {
         return .{
             .message = message,
+            .token = token,
             .errorType = errType,
         };
     }
 
-    pub fn withToken(self: ErrorContext, token: Token) ErrorContext {
-        var copy = self;
-        copy.token = token;
-        return copy;
-    }
     pub fn withSourceContext(self: ErrorContext, source: []const u8) ErrorContext {
         var copy = self;
         copy.sourceCode = source;
@@ -66,9 +62,9 @@ pub const ErrorContext = struct {
     }
 
     pub fn format(ctx: ErrorContext, w: *std.Io.Writer) std.Io.Writer.Error!void {
-        try w.print("Error({t}): {s}", .{ ctx.errorType, ctx.message });
+        try w.print("Error({t}): {s} ", .{ ctx.errorType, ctx.message });
         if (ctx.token) |token| {
-            try w.print(" at {f}", .{token.loc});
+            try w.print(" {any}", .{token.error_format(w)});
         }
     }
 };
