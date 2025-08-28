@@ -29,6 +29,10 @@ pub const LoxError = error{
     TypeMismatch,
     UndefinedVariable,
     WrongNumberOfArguments,
+    // Static Analysis Errors
+    VariableRedeclaration,
+    SelfreferenceInitializer,
+    ReturnFromTopLevel,
     // System Errors
     OutOfMemory,
     WriteFailed,

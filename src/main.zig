@@ -159,7 +159,7 @@ fn processData(gpa: std.mem.Allocator, data: []const u8, env: *Environment) !u8 
     if (diagnostics.hasErrors()) {
         try diagnostics.printDiagnostics(err_writer);
         diagnostics.clearErrors();
-        return runtime_err;
+        return lex_parse_err;
     }
 
     _ = interpreter.interpret(program) catch |err| {

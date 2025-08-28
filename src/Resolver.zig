@@ -16,6 +16,13 @@ interpreter: *Interpreter,
 scopes: ScopeList,
 statements: []const Stmt,
 expressions: []const Expr,
+curr_function: FunctionType = .None,
+
+const FunctionType = enum {
+    None,
+    Function,
+    Class,
+};
 
 pub fn init(allocator: std.mem.Allocator, interpreter: *Interpreter) Resolver {
     return .{
@@ -44,6 +51,8 @@ fn resStmt(self: *Resolver, stmt: Stmt) LoxError!void {
             try self.resExpr(self.expressions[e.value]);
         },
         .Function => |f| {
+            const enclosing_func = self.curr_function;
+            self.curr_function = .Function;
             try self.beginScope();
             for (f.params) |param| {
                 try self.declare(param);
@@ -51,6 +60,7 @@ fn resStmt(self: *Resolver, stmt: Stmt) LoxError!void {
             }
             try self.resStmt(self.statements[f.body]);
             self.endScope();
+            self.curr_function = enclosing_func;
         },
         .If => |i| {
             try self.resExpr(self.expressions[i.condition]);
@@ -61,6 +71,14 @@ fn resStmt(self: *Resolver, stmt: Stmt) LoxError!void {
             try self.resExpr(self.expressions[p.value]);
         },
         .Return => |r| {
+            if (self.curr_function == .None)
+                self.interpreter.diagnostics.reportError(
+                    .init(
+                        "Cannot return from top-level",
+                        LoxError.ReturnFromTopLevel,
+                        r.keyword,
+                    ),
+                );
             try if (r.value) |val| self.resExpr(self.expressions[val]);
         },
         .Variable => |v| {
@@ -109,7 +127,7 @@ fn resExpr(self: *Resolver, expr: Expr) !void {
                 self.interpreter.diagnostics.reportError(
                     .init(
                         "Cannot read local variable in its initializer",
-                        LoxError.UndefinedVariable,
+                        LoxError.SelfreferenceInitializer,
                         v.name,
                     ),
                 );
@@ -128,7 +146,7 @@ fn resolveLocal(self: *Resolver, expr: Expr) !void {
         .Variable => |v| self.getName(v.name),
         else => return LoxError.UnexpectedToken,
     };
-    std.debug.print("Resloving variable: {s}\n", .{name});
+
     while (idx > 0) {
         idx -= 1;
         if (self.scopes.items[idx].contains(name)) {
@@ -142,6 +160,13 @@ fn declare(self: *Resolver, tok: Token) !void {
     if (self.scopes.items.len == 0) return;
 
     var scope = self.scopes.getLast();
+    if (scope.contains(name)) {
+        self.interpreter.diagnostics.reportError(.init(
+            "Variable previously declared in this scope.",
+            LoxError.VariableRedeclaration,
+            tok,
+        ));
+    }
     try scope.put(name, false);
 }
 fn define(self: *Resolver, tok: Token) !void {
