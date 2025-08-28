@@ -1,7 +1,7 @@
 const std = @import("std");
 const ArrayList = std.ArrayList;
 
-const lox = @import("../lox.zig");
+const lox = @import("lox.zig");
 const out_writer = lox.out_writer;
 const Callable = lox.Callable;
 const DiagnosticReporter = lox.DiagnosticReporter;
@@ -9,6 +9,7 @@ const Environment = lox.Environment;
 const ErrorContext = lox.ErrorContext;
 const Expr = lox.Expr;
 const LoxError = lox.LoxError;
+const InterpreterConfig = lox.InterpreterConfig;
 const RuntimeValue = lox.RuntimeValue;
 const Stmt = lox.Stmt;
 const Token = lox.Token;
@@ -18,11 +19,13 @@ pub const Interpreter = struct {
     diagnostics: *DiagnosticReporter,
     environment: *Environment,
     return_value: ?RuntimeValue = null,
+    source_code: []const u8,
+    expressions: []const Expr,
+    statements: []const Stmt,
 
     pub fn init(
         gpa: std.mem.Allocator,
-        diagnostic: *DiagnosticReporter,
-        env: *Environment,
+        config: InterpreterConfig,
     ) !Interpreter {
         const clock_native = try gpa.create(RuntimeValue);
         clock_native.* = .{
@@ -30,23 +33,24 @@ pub const Interpreter = struct {
                 .name = "clock",
             } },
         };
-        try env.define("clock", clock_native.*);
+        try config.global_env.define("clock", clock_native.*);
 
         return .{
             .allocator = gpa,
-            .diagnostics = diagnostic,
-            .environment = env,
+            .diagnostics = config.diagnostic,
+            .source_code = config.source_code,
+            .environment = config.global_env,
+            .expressions = config.expressions,
+            .statements = config.statements,
         };
     }
 
-    pub fn interpret(self: *Interpreter, program: []const Stmt) !void {
-        for (program) |stmt| {
-            try self.execute(stmt);
-        }
+    pub fn interpret(self: *Interpreter, program: Stmt) !void {
+        try self.execute(program);
     }
 
-    pub fn execute(self: *Interpreter, stmt: Stmt) LoxError!void {
-        switch (stmt) {
+    pub fn execute(self: *Interpreter, root: Stmt) LoxError!void {
+        switch (root) {
             .Block => |b| {
                 const outer_env = self.environment;
                 const inner_env = try self.allocator.create(Environment);
@@ -57,7 +61,8 @@ pub const Interpreter = struct {
                     self.allocator.destroy(inner_env);
                 }
                 return for (b.statements) |s| {
-                    self.execute(s.*) catch |err| {
+                    const stmt = self.statements[s];
+                    self.execute(stmt) catch |err| {
                         switch (err) {
                             LoxError.Return => return err,
                             else => {
@@ -72,75 +77,81 @@ pub const Interpreter = struct {
                     };
                 };
             },
-            .Expression => |e| _ = try self.evalExpr(e.value),
+            .Expression => |e| _ = try self.evalExpr(self.expressions[e.value]),
             .Function => |f| {
+                const closure_env = try self.allocator.create(Environment);
+                closure_env.* = Environment.createLocalEnv(self.environment);
+
                 const function = RuntimeValue{
                     .Callable = .{
                         .Function = .{
                             .name = f.name,
                             .params = f.params,
-                            .body = f.body,
+                            .body = self.statements[f.body],
+                            .closure = closure_env,
                         },
                     },
                 };
-                try self.environment.define(f.name.lexeme, function);
+                try self.environment.define(f.name.lexeme(self.source_code), function);
             },
             .If => |i| {
-                const condition = try self.evalExpr(i.condition);
+                const condition = try self.evalExpr(self.expressions[i.condition]);
 
                 if (condition.isTruthy()) {
-                    try self.execute(i.then_branch.*);
+                    try self.execute(self.statements[i.then_branch]);
                 } else if (i.else_branch) |eb| {
-                    try self.execute(eb.*);
+                    try self.execute(self.statements[eb]);
                 }
             },
             .Print => |p| {
-                const value = try self.evalExpr(p.value);
+                const value = try self.evalExpr(self.expressions[p.value]);
                 try out_writer.print("{f}\n", .{value});
                 try out_writer.flush();
             },
             .Return => |r| {
                 const value = if (r.value) |val|
-                    try self.evalExpr(val)
+                    try self.evalExpr(self.expressions[val])
                 else
                     RuntimeValue.Nil;
                 self.return_value = value;
                 return LoxError.Return;
             },
             .Variable => |v| {
-                const value = if (v.value) |val| try self.evalExpr(val) else RuntimeValue.Nil;
-                try self.environment.define(v.name.lexeme, value);
+                const value = if (v.value) |val| try self.evalExpr(
+                    self.expressions[val],
+                ) else RuntimeValue.Nil;
+                try self.environment.define(v.name.lexeme(self.source_code), value);
             },
             .While => |w| {
                 while (true) {
-                    const condition = try self.evalExpr(w.condition);
+                    const condition = try self.evalExpr(self.expressions[w.condition]);
                     if (!condition.isTruthy()) break;
 
-                    try self.execute(w.body.*);
+                    try self.execute(self.statements[w.body]);
                 }
             },
         }
     }
 
-    pub fn evalExpr(self: *Interpreter, expr: *Expr) LoxError!RuntimeValue {
-        switch (expr.*) {
+    pub fn evalExpr(self: *Interpreter, expr: Expr) LoxError!RuntimeValue {
+        switch (expr) {
             .Assign => |a| {
-                const value = try self.evalExpr(a.value);
-                try self.environment.assign(a.name.lexeme, value);
+                const value = try self.evalExpr(self.expressions[a.value]);
+                try self.environment.assign(a.name.lexeme(self.source_code), value);
                 return value;
             },
             .Binary => |b| {
-                const right = try self.evalExpr(b.right);
-                const left = try self.evalExpr(b.left);
+                const right = try self.evalExpr(self.expressions[b.right]);
+                const left = try self.evalExpr(self.expressions[b.left]);
                 return try evalBinary(self, b.op, left, right);
             },
             .Call => |c| {
-                const callee = try self.evalExpr(c.callee);
+                const callee = try self.evalExpr(self.expressions[c.callee]);
 
                 var arguments: ArrayList(RuntimeValue) = .empty;
                 defer arguments.deinit(self.allocator);
                 for (c.args) |arg| {
-                    const arg_value = try self.evalExpr(arg);
+                    const arg_value = try self.evalExpr(self.expressions[arg]);
                     try arguments.append(self.allocator, arg_value);
                 }
 
@@ -154,7 +165,7 @@ pub const Interpreter = struct {
                             );
                             return LoxError.WrongNumberOfArguments;
                         }
-                        return callable.call(self, arguments.items);
+                        return callable.call(self, arguments.items, self.source_code);
                     },
                     else => {
                         self.processRuntimeError(
@@ -166,7 +177,7 @@ pub const Interpreter = struct {
                     },
                 }
             },
-            .Group => |g| return try self.evalExpr(g.expr),
+            .Group => |g| return try self.evalExpr(self.expressions[g.expr]),
             .Literal => |l| return switch (l.value) {
                 .String => |s| RuntimeValue{ .String = s },
                 .Number => |n| RuntimeValue{ .Number = n },
@@ -174,22 +185,22 @@ pub const Interpreter = struct {
                 .Nil => .Nil,
             },
             .Logical => |l| {
-                const left = try self.evalExpr(l.left);
+                const left = try self.evalExpr(self.expressions[l.left]);
 
-                if (l.op.type == .OR) {
+                if (l.op.tag == .Or) {
                     if (left.isTruthy()) return left;
                 } else {
                     if (!left.isTruthy()) return left;
                 }
 
-                return self.evalExpr(l.right);
+                return self.evalExpr(self.expressions[l.right]);
             },
             .Unary => |u| {
-                const right = try self.evalExpr(u.expr);
+                const right = try self.evalExpr(self.expressions[u.expr]);
 
-                switch (u.op.type) {
-                    .BANG => return .{ .Bool = !right.isTruthy() },
-                    .MINUS => {
+                switch (u.op.tag) {
+                    .Bang => return .{ .Bool = !right.isTruthy() },
+                    .Minus => {
                         const right_tag = std.meta.activeTag(right);
                         if (right_tag != .Number) {
                             self.processRuntimeError(
@@ -205,7 +216,7 @@ pub const Interpreter = struct {
                 }
             },
             .Variable => |v| {
-                return self.environment.get(v.name.lexeme);
+                return self.environment.get(v.name.lexeme(self.source_code));
             },
         }
     }
@@ -216,17 +227,17 @@ pub const Interpreter = struct {
         left: RuntimeValue,
         right: RuntimeValue,
     ) LoxError!RuntimeValue {
-        const left_tag = std.meta.activeTag(left);
-        const right_tag = std.meta.activeTag(right);
+        switch (op.tag) {
+            .EqualEqual => return RuntimeValue{ .Bool = left.isEqual(right) },
+            .BangEqual => return RuntimeValue{ .Bool = !left.isEqual(right) },
+            .Plus => {
+                const left_tag = std.meta.activeTag(left);
+                const right_tag = std.meta.activeTag(right);
 
-        if (left_tag != right_tag) {
-            return LoxError.TypeMismatch;
-        }
+                if (left_tag != right_tag) {
+                    return LoxError.TypeMismatch;
+                }
 
-        switch (op.type) {
-            .EQUAL_EQUAL => return RuntimeValue{ .Bool = left.isEqual(right) },
-            .BANG_EQUAL => return RuntimeValue{ .Bool = !left.isEqual(right) },
-            .PLUS => {
                 switch (left_tag) {
                     .String => return .{ .String = try std.fmt.allocPrint(
                         self.allocator,
@@ -244,18 +255,25 @@ pub const Interpreter = struct {
                     },
                 }
             },
-            .MINUS, .SLASH, .STAR, .GREATER, .GREATER_EQUAL, .LESS, .LESS_EQUAL => |sym| {
+            .Minus, .Slash, .Star, .Greater, .GreaterEqual, .Less, .LessEqual => |sym| {
+                const left_tag = std.meta.activeTag(left);
+                const right_tag = std.meta.activeTag(right);
+
+                if (left_tag != right_tag) {
+                    return LoxError.TypeMismatch;
+                }
+
                 if (left_tag != .Number) return LoxError.InvalidOperands;
                 const left_num = left.Number;
                 const right_num = right.Number;
                 return switch (sym) {
-                    .MINUS => .{ .Number = left_num - right_num },
-                    .SLASH => .{ .Number = left_num / right_num }, // TODO: Divide by 0 check
-                    .STAR => .{ .Number = left_num * right_num },
-                    .GREATER => .{ .Bool = left_num > right_num },
-                    .LESS => .{ .Bool = left_num < right_num },
-                    .GREATER_EQUAL => .{ .Bool = left_num >= right_num },
-                    .LESS_EQUAL => .{ .Bool = left_num <= right_num },
+                    .Minus => .{ .Number = left_num - right_num },
+                    .Slash => .{ .Number = left_num / right_num }, // TODO: Divide by 0 check
+                    .Star => .{ .Number = left_num * right_num },
+                    .Greater => .{ .Bool = left_num > right_num },
+                    .Less => .{ .Bool = left_num < right_num },
+                    .GreaterEqual => .{ .Bool = left_num >= right_num },
+                    .LessEqual => .{ .Bool = left_num <= right_num },
                     else => return LoxError.InvalidOperands,
                 };
             },
@@ -269,9 +287,6 @@ pub const Interpreter = struct {
         message: []const u8,
         token: Token,
     ) void {
-        self.diagnostics.reportError(
-            ErrorContext.init(message, err)
-                .withToken(token),
-        );
+        self.diagnostics.reportError(ErrorContext.init(message, err, token));
     }
 };

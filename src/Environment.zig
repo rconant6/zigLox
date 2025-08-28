@@ -1,7 +1,7 @@
 pub const Environment = @This();
 
 const std = @import("std");
-const lox = @import("../lox.zig");
+const lox = @import("lox.zig");
 const LoxError = lox.LoxError;
 const RuntimeValue = lox.RuntimeValue;
 
@@ -25,8 +25,7 @@ pub fn createLocalEnv(parent: *Environment) Environment {
 }
 
 pub fn define(self: *Environment, name: []const u8, val: RuntimeValue) !void {
-    const name_cpy = try self.gpa.dupe(u8, name);
-    try self.env.put(name_cpy, val);
+    try self.env.put(name, val);
 }
 
 pub fn get(self: *Environment, name: []const u8) !RuntimeValue {

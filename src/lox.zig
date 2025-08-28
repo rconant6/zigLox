@@ -1,21 +1,29 @@
 const std = @import("std");
-const intp = @import("interpreter/interpreter.zig");
+const intp = @import("interpreter.zig");
 const lerr = @import("loxError.zig");
-const tok = @import("scanner/tokenizer.zig");
-pub const Callable = @import("interpreter/callable.zig").Callable;
+const tok = @import("tokenizer.zig");
+pub const Callable = @import("callable.zig").Callable;
 pub const DiagnosticReporter = @import("DiagnosticReporter.zig");
-pub const Environment = @import("interpreter/Environment.zig");
+pub const Environment = @import("Environment.zig");
 pub const ErrorContext = lerr.ErrorContext;
 pub const Expr = Parser.Expr;
 pub const ExprIdx = u32;
 pub const ExprValue = Parser.ExprValue;
 pub const Interpreter = intp.Interpreter;
 pub const LoxError = lerr.LoxError;
-pub const Parser = @import("parser/Parser.zig");
+pub const Parser = @import("Parser.zig");
 pub const Tokenizer = tok.Tokenizer;
 pub const Stmt = Parser.Stmt;
 pub const StmtIdx = u32;
 pub const Token = tok.Token;
+
+pub const InterpreterConfig = struct {
+    source_code: []const u8,
+    expressions: []const Expr,
+    statements: []const Stmt,
+    diagnostic: *DiagnosticReporter,
+    global_env: *Environment,
+};
 
 pub const RuntimeValue = union(enum) {
     Bool: bool,
@@ -25,7 +33,12 @@ pub const RuntimeValue = union(enum) {
     Callable: Callable,
 
     pub fn isEqual(self: RuntimeValue, other: RuntimeValue) bool {
-        std.debug.assert(std.meta.activeTag(self) == std.meta.activeTag(other));
+        const left_tag = std.meta.activeTag(self);
+        const right_tag = std.meta.activeTag(other);
+
+        if (left_tag != right_tag) {
+            return false;
+        }
 
         return switch (self) {
             .Bool => |b| b == other.Bool,
@@ -49,7 +62,7 @@ pub const RuntimeValue = union(enum) {
             .Nil => w.print("NIL", .{}),
             .Number => |n| w.print("{d}", .{n}),
             .String => |s| w.print("{s}", .{s}),
-            .Callable => |c| w.print("{s}", .{c.getName()}),
+            .Callable => |c| w.print("{any}", .{c}),
         };
     }
 };

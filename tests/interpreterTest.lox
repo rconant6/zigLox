@@ -1,0 +1,262 @@
+
+// Basic arithmetic
+print 1 + 2;
+print 10 - 3;
+print 4 * 5;
+print 20 / 4;
+print 2 + 3 * 4;
+print (2 + 3) * 4;
+
+// Unary operations
+print -5;
+print !true;
+print !false;
+print !!true;
+
+// Comparison operations
+print 5 > 3;
+print 2 < 8;
+print 5 >= 5;
+print 3 <= 3;
+print 10 == 10;
+print 7 != 9;
+
+// String operations
+print "hello";
+print "hello" + " world";
+print "The answer is " + "42";
+print "";
+
+// Boolean operations
+print true and false;
+print true or false;
+print false or true;
+print true and true;
+print "";
+
+// Nil operations
+print "Nil ops";
+print nil;
+print nil == nil;
+print nil != true;
+print "";
+
+// Variable declarations and usage
+var a = 10;
+print a;
+
+var b = 20;
+print b;
+
+var c = a + b;
+print c;
+
+// Variable assignment
+a = 15;
+print a;
+
+b = a * 2;
+print b;
+
+// String variables
+var name = "Alice";
+print name;
+
+var greeting = "Hello, " + name;
+print greeting;
+
+// Boolean variables
+var flag = true;
+print flag;
+
+flag = !flag;
+print flag;
+
+// Nil variables
+var empty;
+print empty;
+
+empty = "not empty anymore";
+print empty;
+
+// Block scoping
+{
+    var local = 100;
+    print local;
+}
+
+var outer = "outer";
+{
+    print outer;
+    var inner = "inner";
+    print inner;
+    {
+        print outer;
+        print inner;
+        var deeper = "deeper";
+        print deeper;
+    }
+}
+print outer;
+
+// Variable shadowing
+print "Shadowing of vars";
+var x = "global";
+{
+    var x = "local";
+    print x;
+}
+print x;
+
+// If statements
+print "If statements";
+var num = 5;
+if (num > 0) {
+    print "positive";
+}
+
+if (num < 0) {
+    print "negative";
+} else {
+    print "zero or positive";
+}
+
+if (num > 10) {
+    print "large";
+} else if (num > 0) {
+    print "small positive";
+} else {
+    print "zero or negative";
+}
+
+// While loops
+print "While loops";
+var i = 0;
+while (i < 3) {
+    print i;
+    i = i + 1;
+}
+
+// For loops
+print "For loops (j 0..3)";
+for (var j = 0; j < 3; j = j + 1) {
+    print j;
+}
+
+// Nested loops
+print "Nested loops 2x2";
+for (var row = 0; row < 2; row = row + 1) {
+    print row;
+    for (var col = 0; col < 2; col = col + 1) {
+        print col;
+    }
+}
+
+// Complex expressions in control flow
+print "Complex control flow";
+var score = 85;
+if (score >= 90) {
+    print "A";
+} else if (score >= 80) {
+    print "B";
+} else if (score >= 70) {
+    print "C";
+} else {
+    print "F";
+}
+
+// Logical operators in conditions
+print "Logical ops in conditions";
+var age = 25;
+var hasLicense = true;
+if (age >= 18 and hasLicense) {
+    print "Can drive";
+} else {
+    print "Cannot drive";
+}
+
+// Complex nested statements
+print "Complex nested statements";
+var total = 0;
+for (var n = 1; n <= 5; n = n + 1) {
+    total = total + n;
+    if (total > 10) {
+        print "Total exceeded 10: ";
+        print total;
+    }
+}
+print "Final total: ";
+print total;
+
+// Mixed data types
+print "Mixed data types";
+var mixed = 42;
+print mixed;
+mixed = "forty-two";
+print mixed;
+mixed = true;
+print mixed;
+mixed = nil;
+print mixed;
+
+// Truthiness tests
+print "Truthiness tests";
+if (true) print "true is truthy";
+if (false) print "false is truthy"; else print "false is falsy";
+if (nil) print "nil is truthy"; else print "nil is falsy";
+if (0) print "0 is truthy";
+if ("") print "empty string is truthy";
+if ("hello") print "non-empty string is truthy";
+
+// String and number coercion edge cases
+print "String and number coercion";
+print "5" + "3";
+print 5 == 5;
+print "5" == "5";
+print 5 != "5";
+
+// Precedence testing
+print "Precedence testing";
+print 2 + 3 * 4 == 14;
+print (2 + 3) * 4 == 20;
+print 2 * 3 + 4 == 10;
+print 2 * (3 + 4) == 14;
+
+// Assignment in expressions
+print "Assignment in expression";
+var result;
+result = 5;
+print result;
+
+var another = result = 10;
+print result;
+print another;
+
+// Complex assignment patterns
+print "Complex assignment";
+var counter = 0;
+counter = counter + 1;
+print counter;
+counter = counter * 2;
+print counter;
+
+// Environment persistence test (for REPL)
+print "Persistence for REPL";
+var persistent = "I should persist";
+print persistent;
+
+// Environment closures test
+print "Closure test";
+fun makeCounter() {
+  var i = 0;
+  fun count() {
+    i = i + 1;
+    print i;
+  }
+
+  return count;
+}
+
+var counter = makeCounter();
+counter(); // "1".
+counter(); // "2".

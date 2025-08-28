@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const lox = @import("../lox.zig");
+const lox = @import("lox.zig");
 const Environment = lox.Environment;
 const Interpreter = lox.Interpreter;
 const LoxError = lox.LoxError;
@@ -22,8 +22,8 @@ pub const Callable = union(enum) {
     Function: struct {
         name: Token,
         params: []const Token,
-        body: *const Stmt,
-        // closure: *Environment,
+        body: Stmt,
+        closure: *Environment,
     },
     NativeFunction: struct {
         name: []const u8,
@@ -33,9 +33,15 @@ pub const Callable = union(enum) {
         self: Callable,
         interpreter: *Interpreter,
         arguments: []const RuntimeValue,
+        src: []const u8,
     ) LoxError!RuntimeValue {
         switch (self) {
-            .Function => |func| return self.callFunction(func, interpreter, arguments),
+            .Function => |func| return self.callFunction(
+                func,
+                interpreter,
+                arguments,
+                src,
+            ),
             .NativeFunction => |native| {
                 const impl = NATIVE_FUNCTIONS.get(native.name) orelse return .Nil;
                 return impl.callFn(interpreter, arguments);
@@ -50,9 +56,9 @@ pub const Callable = union(enum) {
         }
     }
 
-    pub fn getName(self: Callable) []const u8 {
+    pub fn getName(self: Callable, src: []const u8) []const u8 {
         switch (self) {
-            .Function => |func| return func.name.lexeme,
+            .Function => |func| return func.name.lexeme(src),
             .NativeFunction => |native| return native.name,
         }
     }
@@ -62,19 +68,18 @@ pub const Callable = union(enum) {
         func: @TypeOf(self.Function),
         interpreter: *Interpreter,
         arguments: []const RuntimeValue,
+        src: []const u8,
     ) LoxError!RuntimeValue {
         const local_env = try interpreter.allocator.create(Environment);
-        defer interpreter.allocator.destroy(local_env);
-        local_env.* = .createLocalEnv(interpreter.environment);
+        local_env.* = .createLocalEnv(func.closure); // Use the captured closure
         const parent_env = interpreter.environment;
         interpreter.environment = local_env;
         defer interpreter.environment = parent_env;
-
         for (func.params, arguments) |param, arg| {
-            try local_env.define(param.lexeme, arg);
+            try local_env.define(param.lexeme(src), arg);
         }
 
-        interpreter.execute(func.body.*) catch |err| switch (err) {
+        interpreter.execute(func.body) catch |err| switch (err) {
             LoxError.Return => {
                 const return_val = interpreter.return_value orelse .Nil;
                 interpreter.return_value = null;

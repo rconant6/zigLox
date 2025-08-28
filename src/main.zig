@@ -5,6 +5,9 @@ const DebugAllocator = std.heap.DebugAllocator;
 const DebugAllocatorConfig = std.heap.DebugAllocatorConfig;
 const lox = @import("lox.zig");
 const DiagnosticReporter = lox.DiagnosticReporter;
+const Environment = lox.Environment;
+const Interpreter = lox.Interpreter;
+const InterpreterConfig = lox.InterpreterConfig;
 const Parser = lox.Parser;
 const Token = lox.Token;
 const Tokenizer = lox.Tokenizer;
@@ -42,9 +45,12 @@ fn runFromPrompt(gpa: std.mem.Allocator) anyerror!void {
     var history: ArrayList([]const u8) = .empty;
     defer history.deinit(gpa);
 
-    // const global_env = try gpa.create(Environment);
-    // defer gpa.destroy(global_env);
-    // global_env.* = .createGlobalEnv(gpa);
+    const global_env = try gpa.create(Environment);
+    global_env.* = .createGlobalEnv(gpa);
+    defer {
+        global_env.env.deinit();
+        gpa.destroy(global_env);
+    }
 
     while (true) {
         try out_writer.print("zlox> ", .{});
@@ -65,8 +71,7 @@ fn runFromPrompt(gpa: std.mem.Allocator) anyerror!void {
 
         if (std.mem.eql(u8, trimmed, "exit")) break;
 
-        // _ = processData(gpa, trimmed, global_env) catch |err| {
-        _ = processData(gpa, trimmed) catch |err| {
+        _ = processData(gpa, trimmed, global_env) catch |err| {
             try err_writer.print("ERROR: {any}\n", .{err});
             try err_writer.flush();
         };
@@ -93,22 +98,25 @@ fn runFromFile(gpa: std.mem.Allocator, file_name: []const u8) !void {
     const bytes = try file.readAll(data);
     std.debug.assert(bytes == stats.size);
 
-    // const global_env = try gpa.create(Environment);
-    // defer gpa.destroy(global_env);
-    // global_env.* = .createGlobalEnv(gpa);
+    const global_env = try gpa.create(Environment);
+    defer {
+        global_env.env.deinit();
+        gpa.destroy(global_env);
+    }
+    global_env.* = .createGlobalEnv(gpa);
 
-    // const return_val = try processData(gpa, data, global_env);
-    const return_val = try processData(gpa, data);
+    const return_val = try processData(gpa, data, global_env);
     std.process.exit(return_val);
 }
 
-// fn processData(gpa: std.mem.Allocator, data: []const u8, env: *Environment) !u8 {
-fn processData(gpa: std.mem.Allocator, data: []const u8) !u8 {
+fn processData(gpa: std.mem.Allocator, data: []const u8, env: *Environment) !u8 {
     var diagnostics: DiagnosticReporter = .init(gpa);
-    defer diagnostics.deinit();
+    var arena_alloc = std.heap.ArenaAllocator.init(gpa);
+    const arena = arena_alloc.allocator();
+    defer arena_alloc.deinit();
 
     var scanner: Tokenizer = .init();
-    const tokens = scanner.scanTokens(gpa, data, &diagnostics) catch {
+    const tokens = scanner.scanTokens(arena, data, &diagnostics) catch {
         if (diagnostics.hasErrors()) {
             std.log.err(
                 "FAILURE: Lexing failed with {d} Error(s)",
@@ -118,15 +126,14 @@ fn processData(gpa: std.mem.Allocator, data: []const u8) !u8 {
         }
         return lex_parse_err;
     };
-    defer gpa.free(tokens);
 
     if (tokens.len <= 1) return 0;
     std.log.info("SUCCESS:  Lexing Complete with {d} tokens", .{tokens.len});
+    diagnostics.clearErrors();
 
-    var parser: Parser = .init(gpa, &diagnostics, tokens, data);
-    defer parser.deinit();
-    // const statements = parser.parse(tokens) catch {
-    const stmt = parser.parse(tokens) catch {
+    var parser: Parser = .init(arena, &diagnostics, tokens, data);
+
+    const program = parser.parse(tokens) catch {
         std.log.err(
             "FAILURE: Parsing failed with {d} Error(s)",
             .{diagnostics.errors.items.len},
@@ -136,23 +143,30 @@ fn processData(gpa: std.mem.Allocator, data: []const u8) !u8 {
         }
         return lex_parse_err;
     };
-    _ = stmt;
-
     std.log.info("SUCCESS:  Parsing Complete", .{});
+    diagnostics.clearErrors();
 
-    // var interpreter: Interpreter = try .init(gpa, &diagnostics, env);
-    // _ = interpreter.interpret(statements) catch |err| {
-    //     std.log.err("Runtime exited with error {}", .{err});
-    //     if (diagnostics.hasErrors()) {
-    //         try diagnostics.printDiagnostics(err_writer);
-    //     }
-    //     return lex_parse_err;
-    // };
+    const config: InterpreterConfig = .{
+        .diagnostic = &diagnostics,
+        .expressions = try parser.expressions.toOwnedSlice(arena),
+        .statements = try parser.statements.toOwnedSlice(arena),
+        .source_code = data,
+        .global_env = env,
+    };
 
-    // if (diagnostics.hasErrors()) {
-    //     try diagnostics.printDiagnostics(err_writer);
-    //     return runtime_err;
-    // }
+    var interpreter: Interpreter = try .init(arena, config);
+    _ = interpreter.interpret(program) catch |err| {
+        std.log.err("Runtime exited with error {}", .{err});
+        if (diagnostics.hasErrors()) {
+            try diagnostics.printDiagnostics(err_writer);
+        }
+        return lex_parse_err;
+    };
+
+    if (diagnostics.hasErrors()) {
+        try diagnostics.printDiagnostics(err_writer);
+        return runtime_err;
+    }
 
     return 0;
 }

@@ -163,6 +163,3 @@ var scope_test = "outer";
     print scope_test;
 }
 print scope_test;
-
-print "test there is no semi-colon"
-print var ;

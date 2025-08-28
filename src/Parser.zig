@@ -2,7 +2,7 @@ pub const Parser = @This();
 
 const std = @import("std");
 const ArrayList = std.ArrayList;
-const lox = @import("../lox.zig");
+const lox = @import("lox.zig");
 const DiagnosticsReporter = lox.DiagnosticReporter;
 const ErrorContext = lox.ErrorContext;
 const ExprIdx = lox.ExprIdx;
