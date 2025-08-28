@@ -22,6 +22,7 @@ pub const Interpreter = struct {
     source_code: []const u8,
     expressions: []const Expr,
     statements: []const Stmt,
+    locals: std.AutoArrayHashMapUnmanaged(Token, usize),
 
     pub fn init(
         gpa: std.mem.Allocator,
@@ -42,6 +43,7 @@ pub const Interpreter = struct {
             .environment = config.global_env,
             .expressions = config.expressions,
             .statements = config.statements,
+            .locals = .empty,
         };
     }
 
@@ -50,10 +52,12 @@ pub const Interpreter = struct {
     }
 
     pub fn resolve(self: *Interpreter, expr: Expr, depth: usize) !void {
-        _ = self;
-        _ = expr;
-        _ = depth;
-        return LoxError.Unimplemented;
+        const token = switch (expr) {
+            .Assign => |a| a.name,
+            .Variable => |v| v.name,
+            else => return,
+        };
+        try self.locals.put(self.allocator, token, depth);
     }
 
     pub fn execute(self: *Interpreter, root: Stmt) LoxError!void {
@@ -144,7 +148,16 @@ pub const Interpreter = struct {
         switch (expr) {
             .Assign => |a| {
                 const value = try self.evalExpr(self.expressions[a.value]);
-                try self.environment.assign(a.name.lexeme(self.source_code), value);
+                const name = a.name.lexeme(self.source_code);
+                if (self.locals.get(a.name)) |distance| {
+                    var env = self.environment;
+                    for (0..distance) |_| {
+                        env = env.parent orelse return LoxError.UndefinedVariable;
+                    }
+                    try env.assign(name, value);
+                } else {
+                    try self.environment.assign(name, value);
+                }
                 return value;
             },
             .Binary => |b| {
@@ -223,7 +236,19 @@ pub const Interpreter = struct {
                 }
             },
             .Variable => |v| {
-                return self.environment.get(v.name.lexeme(self.source_code));
+                const name = v.name.lexeme(self.source_code);
+                if (self.locals.get(v.name)) |distance| {
+                    // Walk up the environment chain
+                    var env = self.environment;
+                    std.debug.print("Assignment distance: {}\n", .{distance});
+                    for (0..distance) |_| {
+                        env = env.parent orelse return LoxError.UndefinedVariable;
+                    }
+                    return env.get(name);
+                } else {
+                    // Global variable
+                    return self.environment.get(name);
+                }
             },
         }
     }

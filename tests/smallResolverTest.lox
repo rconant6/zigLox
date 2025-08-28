@@ -1,0 +1,72 @@
+
+// Simple variable declaration and usage
+var a = 10;
+print a;
+
+// Variable assignment
+var b = 20;
+b = 30;
+print b;
+
+// Block scoping
+var outer = "outer";
+{
+    var inner = "inner";
+    print outer;
+    print inner;
+}
+print outer;
+
+// Variable shadowing
+var x = "global";
+{
+    var x = "local";
+    print x;
+}
+print x;
+
+// Nested blocks
+var level1 = "one";
+{
+    var level2 = "two";
+    {
+        var level3 = "three";
+        print level1;
+        print level2;
+        print level3;
+    }
+}
+
+// Assignment in nested scopes
+var counter = 0;
+{
+    counter = 1;
+    {
+        counter = 2;
+    }
+}
+print counter;
+
+// Multiple variables in same scope
+{
+    var first = 1;
+    var second = 2;
+    var third = first + second;
+    print third;
+}
+
+// Variable in if statement
+var condition = true;
+if (condition) {
+    var result = "inside if";
+    print result;
+}
+
+// Function with parameters and locals
+fun testFunction(param1, param2) {
+    var local = param1 + param2;
+    print local;
+    return local;
+}
+
+testFunction(5, 10);

@@ -49,7 +49,7 @@ fn resStmt(self: *Resolver, stmt: Stmt) LoxError!void {
                 try self.declare(param);
                 try self.define(param);
             }
-            try self.resolve(self.statements[f.body]);
+            try self.resStmt(self.statements[f.body]);
             self.endScope();
         },
         .If => |i| {
@@ -65,9 +65,8 @@ fn resStmt(self: *Resolver, stmt: Stmt) LoxError!void {
         },
         .Variable => |v| {
             try self.declare(v.name);
-            if (v.value) |val| try self.resExpr(
-                self.expressions[val],
-            ) else try self.define(v.name);
+            if (v.value) |val| try self.resExpr(self.expressions[val]);
+            try self.define(v.name);
         },
         .While => |w| {
             try self.resExpr(self.expressions[w.condition]);
@@ -124,8 +123,14 @@ fn resExpr(self: *Resolver, expr: Expr) !void {
 // MARK: Scope stuff
 fn resolveLocal(self: *Resolver, expr: Expr) !void {
     var idx = self.scopes.items.len - 1;
-    const name = self.getName(expr.Variable.name);
-    while (idx > 0) : (idx -= 1) {
+    const name = switch (expr) {
+        .Assign => |a| self.getName(a.name),
+        .Variable => |v| self.getName(v.name),
+        else => return LoxError.UnexpectedToken,
+    };
+    std.debug.print("Resloving variable: {s}\n", .{name});
+    while (idx > 0) {
+        idx -= 1;
         if (self.scopes.items[idx].contains(name)) {
             try self.interpreter.resolve(expr, self.scopes.items.len - 1 - idx);
             return;
