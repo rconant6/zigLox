@@ -9,6 +9,7 @@ const Environment = lox.Environment;
 const Interpreter = lox.Interpreter;
 const InterpreterConfig = lox.InterpreterConfig;
 const Parser = lox.Parser;
+const Resolver = lox.Resolver;
 const Token = lox.Token;
 const Tokenizer = lox.Tokenizer;
 
@@ -153,18 +154,22 @@ fn processData(gpa: std.mem.Allocator, data: []const u8, env: *Environment) !u8 
     };
 
     var interpreter: Interpreter = try .init(gpa, config);
+    var resolver: Resolver = .init(gpa, &interpreter);
+    _ = try resolver.resolve(program);
+    if (diagnostics.hasErrors()) {
+        try diagnostics.printDiagnostics(err_writer);
+        diagnostics.clearErrors();
+        return runtime_err;
+    }
+
     _ = interpreter.interpret(program) catch |err| {
         std.log.err("Runtime exited with error {}", .{err});
         if (diagnostics.hasErrors()) {
             try diagnostics.printDiagnostics(err_writer);
+            diagnostics.clearErrors();
         }
-        return lex_parse_err;
-    };
-
-    if (diagnostics.hasErrors()) {
-        try diagnostics.printDiagnostics(err_writer);
         return runtime_err;
-    }
+    };
 
     return 0;
 }

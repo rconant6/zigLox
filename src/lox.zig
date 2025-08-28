@@ -12,9 +12,10 @@ pub const ExprValue = Parser.ExprValue;
 pub const Interpreter = intp.Interpreter;
 pub const LoxError = lerr.LoxError;
 pub const Parser = @import("Parser.zig");
-pub const Tokenizer = tok.Tokenizer;
+pub const Resolver = @import("Resolver.zig");
 pub const Stmt = Parser.Stmt;
 pub const StmtIdx = u32;
+pub const Tokenizer = tok.Tokenizer;
 pub const Token = tok.Token;
 
 pub const InterpreterConfig = struct {

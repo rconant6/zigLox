@@ -49,6 +49,13 @@ pub const Interpreter = struct {
         try self.execute(program);
     }
 
+    pub fn resolve(self: *Interpreter, expr: Expr, depth: usize) !void {
+        _ = self;
+        _ = expr;
+        _ = depth;
+        return LoxError.Unimplemented;
+    }
+
     pub fn execute(self: *Interpreter, root: Stmt) LoxError!void {
         switch (root) {
             .Block => |b| {
