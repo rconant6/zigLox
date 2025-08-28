@@ -18,12 +18,20 @@ const NATIVE_FUNCTIONS = std.StaticStringMap(NativeFnImpl).initComptime(.{
     // .{ "print", NativeFnImpl{ .arity = 1, .callFn = printImpl } },
 });
 
+pub const Instance = struct {
+    class: Callable,
+
+    pub fn format(self: Instance, w: *std.Io.Writer) !void {
+        try w.print("{s} instance", .{self.class.Class.name});
+    }
+};
+
 pub const Callable = union(enum) {
     Class: struct {
-        name: Token,
+        name: []const u8,
     },
     Function: struct {
-        name: Token,
+        name: []const u8,
         params: []const Token,
         body: Stmt,
         closure: *Environment,
@@ -39,7 +47,9 @@ pub const Callable = union(enum) {
         src: []const u8,
     ) LoxError!RuntimeValue {
         switch (self) {
-            .Class => return .Nil,
+            .Class => return .{ .Instance = .{
+                .class = self,
+            } },
             .Function => |func| return self.callFunction(
                 func,
                 interpreter,

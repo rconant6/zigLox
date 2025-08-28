@@ -94,7 +94,7 @@ pub const Interpreter = struct {
                 const new_class = RuntimeValue{
                     .Callable = .{
                         .Class = .{
-                            .name = c.name,
+                            .name = name,
                         },
                     },
                 };
@@ -108,7 +108,7 @@ pub const Interpreter = struct {
                 const function = RuntimeValue{
                     .Callable = .{
                         .Function = .{
-                            .name = f.name,
+                            .name = f.name.lexeme(self.source_code),
                             .params = f.params,
                             .body = self.statements[f.body],
                             .closure = closure_env,
