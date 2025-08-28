@@ -88,6 +88,18 @@ pub const Interpreter = struct {
                     };
                 };
             },
+            .Class => |c| {
+                const name = c.name.lexeme(self.source_code);
+                try self.environment.define(name, .Nil);
+                const new_class = RuntimeValue{
+                    .Callable = .{
+                        .Class = .{
+                            .name = c.name,
+                        },
+                    },
+                };
+                try self.environment.assign(name, new_class);
+            },
             .Expression => |e| _ = try self.evalExpr(self.expressions[e.value]),
             .Function => |f| {
                 const closure_env = try self.allocator.create(Environment);

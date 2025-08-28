@@ -3,7 +3,8 @@ GRAMMAR
 program        → declaration* EOF ;
 
 STATEMENTS
-declaration    → funDecl
+declaration    → classDecl
+               | funDecl
                | varDecl
                | statement ;
 
@@ -25,6 +26,8 @@ ifStmt         → "if" "(" expression ")" statement
                ( "else" statement )? ;
 
 block          → "{" declaration* "}" ;
+
+classDecl      → "class" IDENTIFIER "{" function* "}" ;
 
 funDecl        → "fun" function ;
 function       → IDENTIFIER "(" parameters? ")" block ;

@@ -47,6 +47,10 @@ fn resStmt(self: *Resolver, stmt: Stmt) LoxError!void {
             }
             self.endScope();
         },
+        .Class => |c| {
+            try self.declare(c.name);
+            try self.define(c.name);
+        },
         .Expression => |e| {
             try self.resExpr(self.expressions[e.value]);
         },

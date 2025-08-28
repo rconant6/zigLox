@@ -120,8 +120,8 @@ pub fn advance(self: *Parser) void {
 }
 
 pub fn check(self: *Parser, t_type: TokenType) bool {
-    if (self.current >= self.src
-        .len) return false;
+    if (self.current >= self.src.len) return false;
+
     const curr_tok = self.src[self.current];
     return curr_tok.tag == t_type;
 }
@@ -161,6 +161,11 @@ pub const Stmt = union(enum) {
     Block: ParseType(struct {
         statements: []const StmtIdx,
         loc: Token,
+    }),
+    Class: ParseType(struct {
+        name: Token,
+        superclass: ?ExprIdx,
+        methods: []const StmtIdx,
     }),
     Expression: ParseType(struct {
         value: ExprIdx,
@@ -203,6 +208,7 @@ const StatementParser = union(enum) {
 };
 
 const statement_parsers = [_]StatementParser{
+    .{ .simple = .{ .token_type = .Class, .parser_fn = classStatement } },
     .{ .simple = .{ .token_type = .For, .parser_fn = forStatement } },
     .{ .simple = .{ .token_type = .If, .parser_fn = ifStatement } },
     .{ .simple = .{ .token_type = .LeftBrace, .parser_fn = blockStatement } },
@@ -316,6 +322,24 @@ fn blockStatement(self: *Parser) LoxError!StmtIdx {
     return self.createStmt(.{ .Block = .{
         .statements = try statements.toOwnedSlice(self.gpa),
         .loc = self.previous() orelse self.src[self.current],
+    } });
+}
+
+fn classStatement(self: *Parser) LoxError!StmtIdx {
+    const name = try self.expect(.Identifier, "Expecting class name after 'class'");
+    _ = try self.expect(.LeftBrace, "Expect '{' to open class body");
+
+    var methods: ArrayList(StmtIdx) = .empty;
+    while (!self.check(.RightBrace)) {
+        try methods.append(self.gpa, try self.functionStatement("method"));
+    }
+
+    _ = try self.expect(.RightBrace, "Expect '}' to close class body");
+
+    return self.createStmt(.{ .Class = .{
+        .name = name,
+        .superclass = null,
+        .methods = try methods.toOwnedSlice(self.gpa),
     } });
 }
 
@@ -466,7 +490,6 @@ fn printStatement(self: *Parser) LoxError!StmtIdx {
 
 fn returnStatement(self: *Parser) LoxError!StmtIdx {
     const keyword = self.previous() orelse unreachable; // can only get here /w .RETURN
-    // std.debug.assert(keyword.type == .RETURN);
 
     const value = if (!self.check(.SemiColon))
         try self.expression()

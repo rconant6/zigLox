@@ -19,6 +19,9 @@ const NATIVE_FUNCTIONS = std.StaticStringMap(NativeFnImpl).initComptime(.{
 });
 
 pub const Callable = union(enum) {
+    Class: struct {
+        name: Token,
+    },
     Function: struct {
         name: Token,
         params: []const Token,
@@ -36,6 +39,7 @@ pub const Callable = union(enum) {
         src: []const u8,
     ) LoxError!RuntimeValue {
         switch (self) {
+            .Class => return .Nil,
             .Function => |func| return self.callFunction(
                 func,
                 interpreter,
@@ -51,6 +55,7 @@ pub const Callable = union(enum) {
 
     pub fn arity(self: Callable) usize {
         switch (self) {
+            .Class => return 0,
             .Function => |func| return func.params.len,
             .NativeFunction => |native| return NATIVE_FUNCTIONS.get(native.name).?.arity,
         }
@@ -58,6 +63,7 @@ pub const Callable = union(enum) {
 
     pub fn getName(self: Callable, src: []const u8) []const u8 {
         switch (self) {
+            .Class => |class| return class.name.lexeme(src),
             .Function => |func| return func.name.lexeme(src),
             .NativeFunction => |native| return native.name,
         }
