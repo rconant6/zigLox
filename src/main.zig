@@ -24,12 +24,17 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
+    var arena_alloc = std.heap.ArenaAllocator.init(allocator);
+    const arena = arena_alloc.allocator();
+    errdefer arena_alloc.deinit();
+    defer arena_alloc.deinit();
+
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
 
     switch (args.len) {
-        1 => try runFromPrompt(allocator),
-        2 => try runFromFile(allocator, args[1]),
+        1 => try runFromPrompt(arena),
+        2 => try runFromFile(arena, args[1]),
         else => {
             try out_writer.print("Usage: zlox [script]\n", .{});
             try out_writer.flush();
@@ -47,10 +52,6 @@ fn runFromPrompt(gpa: std.mem.Allocator) anyerror!void {
 
     const global_env = try gpa.create(Environment);
     global_env.* = .createGlobalEnv(gpa);
-    defer {
-        global_env.env.deinit();
-        gpa.destroy(global_env);
-    }
 
     while (true) {
         try out_writer.print("zlox> ", .{});
@@ -111,12 +112,9 @@ fn runFromFile(gpa: std.mem.Allocator, file_name: []const u8) !void {
 
 fn processData(gpa: std.mem.Allocator, data: []const u8, env: *Environment) !u8 {
     var diagnostics: DiagnosticReporter = .init(gpa);
-    var arena_alloc = std.heap.ArenaAllocator.init(gpa);
-    const arena = arena_alloc.allocator();
-    defer arena_alloc.deinit();
 
     var scanner: Tokenizer = .init();
-    const tokens = scanner.scanTokens(arena, data, &diagnostics) catch {
+    const tokens = scanner.scanTokens(gpa, data, &diagnostics) catch {
         if (diagnostics.hasErrors()) {
             std.log.err(
                 "FAILURE: Lexing failed with {d} Error(s)",
@@ -131,7 +129,7 @@ fn processData(gpa: std.mem.Allocator, data: []const u8, env: *Environment) !u8 
     std.log.info("SUCCESS:  Lexing Complete with {d} tokens", .{tokens.len});
     diagnostics.clearErrors();
 
-    var parser: Parser = .init(arena, &diagnostics, tokens, data);
+    var parser: Parser = .init(gpa, &diagnostics, tokens, data);
 
     const program = parser.parse(tokens) catch {
         std.log.err(
@@ -148,13 +146,13 @@ fn processData(gpa: std.mem.Allocator, data: []const u8, env: *Environment) !u8 
 
     const config: InterpreterConfig = .{
         .diagnostic = &diagnostics,
-        .expressions = try parser.expressions.toOwnedSlice(arena),
-        .statements = try parser.statements.toOwnedSlice(arena),
+        .expressions = try parser.expressions.toOwnedSlice(gpa),
+        .statements = try parser.statements.toOwnedSlice(gpa),
         .source_code = data,
         .global_env = env,
     };
 
-    var interpreter: Interpreter = try .init(arena, config);
+    var interpreter: Interpreter = try .init(gpa, config);
     _ = interpreter.interpret(program) catch |err| {
         std.log.err("Runtime exited with error {}", .{err});
         if (diagnostics.hasErrors()) {
