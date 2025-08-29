@@ -4,13 +4,15 @@ const lerr = @import("loxError.zig");
 const tok = @import("tokenizer.zig");
 const clbl = @import("callable.zig");
 pub const Callable = clbl.Callable;
+pub const ClassData = clbl.ClassData;
 pub const DiagnosticReporter = @import("DiagnosticReporter.zig");
 pub const Environment = @import("Environment.zig");
 pub const ErrorContext = lerr.ErrorContext;
 pub const Expr = Parser.Expr;
 pub const ExprIdx = u32;
 pub const ExprValue = Parser.ExprValue;
-pub const Instance = clbl.Instance;
+pub const FunctionData = clbl.FunctionData;
+pub const Instance = @import("Instance.zig").Instance;
 pub const Interpreter = intp.Interpreter;
 pub const LoxError = lerr.LoxError;
 pub const Parser = @import("Parser.zig");
@@ -34,7 +36,7 @@ pub const RuntimeValue = union(enum) {
     Number: f64,
     String: []const u8,
     Callable: Callable,
-    Instance: Instance,
+    Instance: *Instance,
 
     pub fn isEqual(self: RuntimeValue, other: RuntimeValue) bool {
         const left_tag = std.meta.activeTag(self);
@@ -50,7 +52,7 @@ pub const RuntimeValue = union(enum) {
             .Number => |n| n == other.Number,
             .String => |s| std.mem.eql(u8, s, other.String),
             .Callable => false,
-            .Instance => false, // TODO: this is going to need ot be fixed
+            .Instance => |i| i == other.Instance,
         };
     }
 
@@ -70,8 +72,8 @@ pub const RuntimeValue = union(enum) {
             .Callable => |c| {
                 try switch (c) {
                     .Class => |cl| w.print("{s}", .{cl.name}),
-                    .Function => |f| w.print("{s}", .{f.name}),
-                    .NativeFunction => |n| w.print("{s}", .{n.name}),
+                    .Function => |f| w.print("<fn {s}>", .{f.name}),
+                    .NativeFunction => |n| w.print("<native fn {s}>", .{n.name}),
                 };
             },
             .Instance => |i| w.print("{f}", .{i}),

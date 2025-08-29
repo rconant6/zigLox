@@ -8,6 +8,7 @@ const DiagnosticReporter = lox.DiagnosticReporter;
 const Environment = lox.Environment;
 const ErrorContext = lox.ErrorContext;
 const Expr = lox.Expr;
+const FunctionData = lox.FunctionData;
 const LoxError = lox.LoxError;
 const InterpreterConfig = lox.InterpreterConfig;
 const RuntimeValue = lox.RuntimeValue;
@@ -71,11 +72,13 @@ pub const Interpreter = struct {
                     self.environment = outer_env;
                     self.allocator.destroy(inner_env);
                 }
-                return for (b.statements) |s| {
+                for (b.statements) |s| {
                     const stmt = self.statements[s];
                     self.execute(stmt) catch |err| {
                         switch (err) {
-                            LoxError.Return => return err,
+                            LoxError.Return => {
+                                return err;
+                            },
                             else => {
                                 self.processRuntimeError(
                                     err,
@@ -86,37 +89,34 @@ pub const Interpreter = struct {
                             },
                         }
                     };
-                };
+                }
             },
             .Class => |c| {
                 const class_name = c.name.lexeme(self.source_code);
                 try self.environment.define(class_name, .Nil);
 
-                var methods = std.StringHashMap(RuntimeValue).init(self.allocator);
+                var methods = std.StringHashMap(FunctionData).init(self.allocator);
+
                 for (c.methods) |method_idx| {
                     const method_stmt = self.statements[method_idx];
+
                     switch (method_stmt) {
                         .Function => |f| {
                             const func_name = f.name.lexeme(self.source_code);
-
-                            const method_callable = RuntimeValue{
-                                .Callable = .{
-                                    .Function = .{
-                                        .name = func_name,
-                                        .params = f.params,
-                                        .body = method_stmt,
-                                        .closure = self.environment,
-                                    },
-                                },
+                            const method_body = self.statements[f.body];
+                            const method_callable = FunctionData{
+                                .name = func_name,
+                                .params = f.params,
+                                .body = method_body,
+                                .closure = self.environment,
                             };
-
                             try methods.put(func_name, method_callable);
                         },
                         else => {
                             self.processRuntimeError(
                                 LoxError.NotCallable,
                                 "Methods must be functions",
-                                c.name, // Use c.name instead of c for the token
+                                c.name,
                             );
                         },
                     }
@@ -246,15 +246,8 @@ pub const Interpreter = struct {
                 switch (object_val) {
                     .Instance => |i| {
                         const name = g.name.lexeme(self.source_code);
-                        // First try instance fields
-                        if (try i.get(name)) |field| {
-                            return self.evalExpr(self.expressions[field]);
-                        }
-                        // Then try methods from the class
-                        if (i.class.findMethod(name)) |method| {
-                            return method;
-                        }
-                        // Neither found
+                        if (try i.get(name)) |field| return field;
+                        if (try i.getMethod(name)) |method| return method;
                         return LoxError.UndefinedProperty;
                     },
                     else => return LoxError.NoPropertyAvailable,
@@ -281,9 +274,10 @@ pub const Interpreter = struct {
             .Set => |s| {
                 const object_val = try self.evalExpr(self.expressions[s.object]);
                 switch (object_val) {
-                    .Instance => |*i| {
-                        try @constCast(i).set(s.name.lexeme(self.source_code), s.value);
-                        return self.evalExpr(self.expressions[s.value]);
+                    .Instance => |i| {
+                        const value = try self.evalExpr(self.expressions[s.value]);
+                        try i.set(s.name.lexeme(self.source_code), value);
+                        return value;
                     },
                     else => {
                         self.processRuntimeError(
@@ -293,6 +287,17 @@ pub const Interpreter = struct {
                         );
                         return LoxError.NoPropertyAvailable;
                     },
+                }
+            },
+            .This => |t| {
+                if (self.locals.get(t.keyword)) |distance| {
+                    var env = self.environment;
+                    for (0..distance) |_| {
+                        env = env.parent orelse return LoxError.UndefinedVariable;
+                    }
+                    return env.get("this");
+                } else {
+                    return self.environment.get("this"); // Global vars
                 }
             },
             .Unary => |u| {
@@ -318,16 +323,13 @@ pub const Interpreter = struct {
             .Variable => |v| {
                 const name = v.name.lexeme(self.source_code);
                 if (self.locals.get(v.name)) |distance| {
-                    // Walk up the environment chain
                     var env = self.environment;
-                    std.debug.print("Assignment distance: {}\n", .{distance});
                     for (0..distance) |_| {
                         env = env.parent orelse return LoxError.UndefinedVariable;
                     }
                     return env.get(name);
                 } else {
-                    // Global variable
-                    return self.environment.get(name);
+                    return self.environment.get(name); // Global vars
                 }
             },
         }

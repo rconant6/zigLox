@@ -51,6 +51,12 @@ fn resStmt(self: *Resolver, stmt: Stmt) LoxError!void {
             try self.declare(c.name);
             try self.define(c.name);
 
+            try self.beginScope();
+            defer self.endScope();
+
+            var env = self.scopes.getLast();
+            try env.put("this", true);
+
             const enclosing_func = self.curr_function;
             self.curr_function = .Method;
             defer self.curr_function = enclosing_func;
@@ -137,6 +143,9 @@ fn resExpr(self: *Resolver, expr: Expr) !void {
             try self.resExpr(self.expressions[s.value]);
             try self.resExpr(self.expressions[s.object]);
         },
+        .This => {
+            try self.resolveLocal(expr);
+        },
         .Unary => |u| {
             try self.resExpr(self.expressions[u.expr]);
         },
@@ -164,6 +173,7 @@ fn resolveLocal(self: *Resolver, expr: Expr) !void {
     const name = switch (expr) {
         .Assign => |a| self.getName(a.name),
         .Variable => |v| self.getName(v.name),
+        .This => |t| self.getName(t.keyword),
         else => return LoxError.UnexpectedToken,
     };
 

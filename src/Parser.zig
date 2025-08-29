@@ -54,8 +54,6 @@ pub fn parse(self: *Parser, tokens: []const Token) LoxError!Stmt {
     while (self.peek()) |token| {
         if (token.tag == .Eof) break;
         const stmt_idx = self.program() catch |err| {
-            std.log.debug("Parse error: {}", .{err});
-
             if (err == LoxError.ExpectedSemiColon or
                 err == LoxError.ExpectedClosingParen)
             {
@@ -575,6 +573,9 @@ pub const Expr = union(enum) {
         name: Token,
         value: ExprIdx,
     }),
+    This: ParseType(struct {
+        keyword: Token,
+    }),
     Unary: ParseType(struct {
         op: Token,
         expr: ExprIdx,
@@ -606,12 +607,14 @@ fn assignment(self: *Parser) LoxError!ExprIdx {
                     },
                 });
             },
-            .Variable => |v| return self.createExpr(.{
-                .Assign = .{
-                    .name = v.name,
-                    .value = valueIdx,
-                },
-            }),
+            .Variable => |v| {
+                return self.createExpr(.{
+                    .Assign = .{
+                        .name = v.name,
+                        .value = valueIdx,
+                    },
+                });
+            },
             else => {
                 self.parseError(
                     LoxError.ExpectedLVal,
@@ -730,6 +733,10 @@ pub fn primary(self: *Parser) LoxError!ExprIdx {
         .Nil => return self.createLiteralExpr(.{ .Nil = {} }),
         .Number => return self.createLiteralExpr(.{ .Number = token.literalValue(self.code).number }),
         .String => return self.createLiteralExpr(.{ .String = token.literalValue(self.code).string }),
+        .This => {
+            self.advance();
+            return self.createExpr(.{ .This = .{ .keyword = token } });
+        },
         .LeftParen => {
             self.advance();
 

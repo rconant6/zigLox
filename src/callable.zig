@@ -3,6 +3,7 @@ const std = @import("std");
 const lox = @import("lox.zig");
 const Environment = lox.Environment;
 const ExprIdx = lox.ExprIdx;
+const Instance = lox.Instance;
 const Interpreter = lox.Interpreter;
 const LoxError = lox.LoxError;
 const RuntimeValue = lox.RuntimeValue;
@@ -19,44 +20,47 @@ const NATIVE_FUNCTIONS = std.StaticStringMap(NativeFnImpl).initComptime(.{
     // .{ "print", NativeFnImpl{ .arity = 1, .callFn = printImpl } },
 });
 
-pub const Instance = struct {
-    class: ClassData,
-    fields: std.StringHashMap(ExprIdx),
+pub const ClassData = struct {
+    name: []const u8,
+    methods: std.StringHashMap(FunctionData),
 
-    pub fn get(self: Instance, name: []const u8) LoxError!?ExprIdx {
-        return self.fields.get(name);
-    }
-
-    pub fn set(self: *Instance, name: []const u8, value: ExprIdx) LoxError!void {
-        return self.fields.put(name, value);
-    }
-
-    pub fn findMethod(self: Instance, name: []const u8) LoxError!RuntimeValue {
-        return self.class.findMethod(name) orelse LoxError.MethodNotDefined;
-    }
-
-    pub fn format(self: Instance, w: *std.Io.Writer) !void {
-        try w.print("{s} instance", .{self.class.name});
+    pub fn getMethod(self: ClassData, name: []const u8) ?RuntimeValue {
+        const method = self.methods.get(name) orelse return null;
+        return .{
+            .Callable = .{
+                .Function = method,
+            },
+        };
     }
 };
 
-const ClassData = struct {
+pub const FunctionData = struct {
     name: []const u8,
-    methods: std.StringHashMap(RuntimeValue),
+    params: []const Token,
+    body: Stmt,
+    closure: *Environment,
 
-    pub fn findMethod(self: ClassData, name: []const u8) ?RuntimeValue {
-        return self.methods.get(name);
+    pub fn bind(self: FunctionData, instance: *Instance) LoxError!RuntimeValue {
+        const env = try self.closure.gpa.create(Environment);
+        env.* = Environment.createLocalEnv(self.closure);
+        try env.define("this", RuntimeValue{ .Instance = instance });
+
+        return RuntimeValue{
+            .Callable = .{
+                .Function = .{
+                    .name = self.name,
+                    .params = self.params,
+                    .body = self.body,
+                    .closure = env,
+                },
+            },
+        };
     }
 };
 
 pub const Callable = union(enum) {
     Class: ClassData,
-    Function: struct {
-        name: []const u8,
-        params: []const Token,
-        body: Stmt,
-        closure: *Environment,
-    },
+    Function: FunctionData,
     NativeFunction: struct {
         name: []const u8,
     },
@@ -68,21 +72,26 @@ pub const Callable = union(enum) {
         src: []const u8,
     ) LoxError!RuntimeValue {
         switch (self) {
-            .Class => |c| return .{
-                .Instance = .{
-                    .class = .{
-                        .name = c.name,
-                        .methods = c.methods,
-                    },
-                    .fields = std.StringHashMap(ExprIdx).init(interpreter.allocator),
-                },
+            .Class => |c| {
+                const instance = try interpreter.allocator.create(Instance);
+                instance.* =
+                    .{
+                        .class = .{
+                            .name = c.name,
+                            .methods = c.methods,
+                        },
+                        .fields = std.StringHashMap(RuntimeValue).init(interpreter.allocator),
+                    };
+                return .{ .Instance = instance };
             },
-            .Function => |func| return self.callFunction(
-                func,
-                interpreter,
-                arguments,
-                src,
-            ),
+            .Function => |func| {
+                return self.callFunction(
+                    func,
+                    interpreter,
+                    arguments,
+                    src,
+                );
+            },
             .NativeFunction => |native| {
                 const impl = NATIVE_FUNCTIONS.get(native.name) orelse return .Nil;
                 return impl.callFn(interpreter, arguments);
@@ -114,12 +123,15 @@ pub const Callable = union(enum) {
         src: []const u8,
     ) LoxError!RuntimeValue {
         const local_env = try interpreter.allocator.create(Environment);
-        local_env.* = .createLocalEnv(func.closure); // Use the captured closure
+        local_env.* = .createLocalEnv(func.closure);
+
         const parent_env = interpreter.environment;
         interpreter.environment = local_env;
         defer interpreter.environment = parent_env;
+
         for (func.params, arguments) |param, arg| {
-            try local_env.define(param.lexeme(src), arg);
+            const param_name = param.lexeme(src);
+            try local_env.define(param_name, arg);
         }
 
         interpreter.execute(func.body) catch |err| switch (err) {
@@ -128,7 +140,9 @@ pub const Callable = union(enum) {
                 interpreter.return_value = null;
                 return return_val;
             },
-            else => return err,
+            else => {
+                return err;
+            },
         };
 
         return RuntimeValue.Nil;
