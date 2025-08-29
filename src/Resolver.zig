@@ -21,7 +21,7 @@ curr_function: FunctionType = .None,
 const FunctionType = enum {
     None,
     Function,
-    Class,
+    Method,
 };
 
 pub fn init(allocator: std.mem.Allocator, interpreter: *Interpreter) Resolver {
@@ -50,6 +50,14 @@ fn resStmt(self: *Resolver, stmt: Stmt) LoxError!void {
         .Class => |c| {
             try self.declare(c.name);
             try self.define(c.name);
+
+            const enclosing_func = self.curr_function;
+            self.curr_function = .Method;
+            defer self.curr_function = enclosing_func;
+
+            for (c.methods) |method| {
+                try self.resStmt(self.statements[method]);
+            }
         },
         .Expression => |e| {
             try self.resExpr(self.expressions[e.value]);
@@ -57,6 +65,8 @@ fn resStmt(self: *Resolver, stmt: Stmt) LoxError!void {
         .Function => |f| {
             const enclosing_func = self.curr_function;
             self.curr_function = .Function;
+            defer self.curr_function = enclosing_func;
+
             try self.beginScope();
             for (f.params) |param| {
                 try self.declare(param);
@@ -64,7 +74,6 @@ fn resStmt(self: *Resolver, stmt: Stmt) LoxError!void {
             }
             try self.resStmt(self.statements[f.body]);
             self.endScope();
-            self.curr_function = enclosing_func;
         },
         .If => |i| {
             try self.resExpr(self.expressions[i.condition]);
@@ -113,6 +122,9 @@ fn resExpr(self: *Resolver, expr: Expr) !void {
                 try self.resExpr(self.expressions[c.args[idx]]);
             }
         },
+        .Get => |g| {
+            try self.resExpr(self.expressions[g.object]);
+        },
         .Group => |g| {
             try self.resExpr(self.expressions[g.expr]);
         },
@@ -120,6 +132,10 @@ fn resExpr(self: *Resolver, expr: Expr) !void {
         .Logical => |l| {
             try self.resExpr(self.expressions[l.left]);
             try self.resExpr(self.expressions[l.right]);
+        },
+        .Set => |s| {
+            try self.resExpr(self.expressions[s.value]);
+            try self.resExpr(self.expressions[s.object]);
         },
         .Unary => |u| {
             try self.resExpr(self.expressions[u.expr]);

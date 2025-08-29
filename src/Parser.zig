@@ -57,7 +57,6 @@ pub fn parse(self: *Parser, tokens: []const Token) LoxError!Stmt {
             std.log.debug("Parse error: {}", .{err});
 
             if (err == LoxError.ExpectedSemiColon or
-                err == LoxError.ExpectedExpression or
                 err == LoxError.ExpectedClosingParen)
             {
                 self.synchronize();
@@ -556,6 +555,10 @@ pub const Expr = union(enum) {
         paren: Token,
         args: []const ExprIdx,
     }),
+    Get: ParseType(struct {
+        object: ExprIdx,
+        name: Token,
+    }),
     Group: ParseType(struct {
         expr: ExprIdx,
     }),
@@ -566,6 +569,11 @@ pub const Expr = union(enum) {
         left: ExprIdx,
         op: Token,
         right: ExprIdx,
+    }),
+    Set: ParseType(struct {
+        object: ExprIdx,
+        name: Token,
+        value: ExprIdx,
     }),
     Unary: ParseType(struct {
         op: Token,
@@ -588,20 +596,31 @@ fn assignment(self: *Parser) LoxError!ExprIdx {
         _ = self.previous();
         const valueIdx = try self.assignment();
 
-        if (expr == .Variable) {
-            return self.createExpr(.{
+        switch (expr) {
+            .Get => |g| {
+                return self.createExpr(.{
+                    .Set = .{
+                        .object = g.object,
+                        .name = g.name,
+                        .value = valueIdx,
+                    },
+                });
+            },
+            .Variable => |v| return self.createExpr(.{
                 .Assign = .{
-                    .name = expr.Variable.name,
+                    .name = v.name,
                     .value = valueIdx,
                 },
-            });
+            }),
+            else => {
+                self.parseError(
+                    LoxError.ExpectedLVal,
+                    "Expected LVal for assignment",
+                    self.previous() orelse self.src[self.current - 3],
+                );
+                return LoxError.ExpectedLVal;
+            },
         }
-        self.parseError(
-            LoxError.ExpectedLVal,
-            "Expected LVal for assignment",
-            self.previous() orelse self.src[self.current - 3],
-        );
-        return LoxError.ExpectedLVal;
     }
 
     return eIdx;
@@ -645,15 +664,32 @@ pub fn unary(self: *Parser) LoxError!ExprIdx {
 pub fn call(self: *Parser) LoxError!ExprIdx {
     var exprIdx = try self.primary();
 
-    while (self.match(&.{.LeftParen})) |_| {
-        const argsIdxs = try self.parseArguments();
-
-        const paren = try self.expect(.RightParen, "Expected ')' after arguments");
-        exprIdx = try self.createExpr(.{ .Call = .{
-            .callee = exprIdx,
-            .paren = paren,
-            .args = argsIdxs,
-        } });
+    while (self.match(&.{ .LeftParen, .Dot })) |t| {
+        switch (t.tag) {
+            .LeftParen => {
+                const argsIdxs = try self.parseArguments();
+                const paren = try self.expect(
+                    .RightParen,
+                    "Expected ')' after arguments",
+                );
+                exprIdx = try self.createExpr(.{ .Call = .{
+                    .callee = exprIdx,
+                    .paren = paren,
+                    .args = argsIdxs,
+                } });
+            },
+            .Dot => {
+                const name = try self.expect(
+                    .Identifier,
+                    "Expect property name after '.'",
+                );
+                exprIdx = try self.createExpr(.{ .Get = .{
+                    .object = exprIdx,
+                    .name = name,
+                } });
+            },
+            else => break,
+        }
     }
 
     return exprIdx;

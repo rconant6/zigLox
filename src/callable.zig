@@ -2,6 +2,7 @@ const std = @import("std");
 
 const lox = @import("lox.zig");
 const Environment = lox.Environment;
+const ExprIdx = lox.ExprIdx;
 const Interpreter = lox.Interpreter;
 const LoxError = lox.LoxError;
 const RuntimeValue = lox.RuntimeValue;
@@ -19,17 +20,37 @@ const NATIVE_FUNCTIONS = std.StaticStringMap(NativeFnImpl).initComptime(.{
 });
 
 pub const Instance = struct {
-    class: Callable,
+    class: ClassData,
+    fields: std.StringHashMap(ExprIdx),
+
+    pub fn get(self: Instance, name: []const u8) LoxError!?ExprIdx {
+        return self.fields.get(name);
+    }
+
+    pub fn set(self: *Instance, name: []const u8, value: ExprIdx) LoxError!void {
+        return self.fields.put(name, value);
+    }
+
+    pub fn findMethod(self: Instance, name: []const u8) LoxError!RuntimeValue {
+        return self.class.findMethod(name) orelse LoxError.MethodNotDefined;
+    }
 
     pub fn format(self: Instance, w: *std.Io.Writer) !void {
-        try w.print("{s} instance", .{self.class.Class.name});
+        try w.print("{s} instance", .{self.class.name});
+    }
+};
+
+const ClassData = struct {
+    name: []const u8,
+    methods: std.StringHashMap(RuntimeValue),
+
+    pub fn findMethod(self: ClassData, name: []const u8) ?RuntimeValue {
+        return self.methods.get(name);
     }
 };
 
 pub const Callable = union(enum) {
-    Class: struct {
-        name: []const u8,
-    },
+    Class: ClassData,
     Function: struct {
         name: []const u8,
         params: []const Token,
@@ -47,9 +68,15 @@ pub const Callable = union(enum) {
         src: []const u8,
     ) LoxError!RuntimeValue {
         switch (self) {
-            .Class => return .{ .Instance = .{
-                .class = self,
-            } },
+            .Class => |c| return .{
+                .Instance = .{
+                    .class = .{
+                        .name = c.name,
+                        .methods = c.methods,
+                    },
+                    .fields = std.StringHashMap(ExprIdx).init(interpreter.allocator),
+                },
+            },
             .Function => |func| return self.callFunction(
                 func,
                 interpreter,

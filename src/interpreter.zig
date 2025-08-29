@@ -89,16 +89,48 @@ pub const Interpreter = struct {
                 };
             },
             .Class => |c| {
-                const name = c.name.lexeme(self.source_code);
-                try self.environment.define(name, .Nil);
+                const class_name = c.name.lexeme(self.source_code);
+                try self.environment.define(class_name, .Nil);
+
+                var methods = std.StringHashMap(RuntimeValue).init(self.allocator);
+                for (c.methods) |method_idx| {
+                    const method_stmt = self.statements[method_idx];
+                    switch (method_stmt) {
+                        .Function => |f| {
+                            const func_name = f.name.lexeme(self.source_code);
+
+                            const method_callable = RuntimeValue{
+                                .Callable = .{
+                                    .Function = .{
+                                        .name = func_name,
+                                        .params = f.params,
+                                        .body = method_stmt,
+                                        .closure = self.environment,
+                                    },
+                                },
+                            };
+
+                            try methods.put(func_name, method_callable);
+                        },
+                        else => {
+                            self.processRuntimeError(
+                                LoxError.NotCallable,
+                                "Methods must be functions",
+                                c.name, // Use c.name instead of c for the token
+                            );
+                        },
+                    }
+                }
                 const new_class = RuntimeValue{
                     .Callable = .{
                         .Class = .{
-                            .name = name,
+                            .name = class_name,
+                            .methods = methods,
                         },
                     },
                 };
-                try self.environment.assign(name, new_class);
+
+                try self.environment.assign(class_name, new_class);
             },
             .Expression => |e| _ = try self.evalExpr(self.expressions[e.value]),
             .Function => |f| {
@@ -209,6 +241,25 @@ pub const Interpreter = struct {
                     },
                 }
             },
+            .Get => |g| {
+                const object_val = try self.evalExpr(self.expressions[g.object]);
+                switch (object_val) {
+                    .Instance => |i| {
+                        const name = g.name.lexeme(self.source_code);
+                        // First try instance fields
+                        if (try i.get(name)) |field| {
+                            return self.evalExpr(self.expressions[field]);
+                        }
+                        // Then try methods from the class
+                        if (i.class.findMethod(name)) |method| {
+                            return method;
+                        }
+                        // Neither found
+                        return LoxError.UndefinedProperty;
+                    },
+                    else => return LoxError.NoPropertyAvailable,
+                }
+            },
             .Group => |g| return try self.evalExpr(self.expressions[g.expr]),
             .Literal => |l| return switch (l.value) {
                 .String => |s| RuntimeValue{ .String = s },
@@ -226,6 +277,23 @@ pub const Interpreter = struct {
                 }
 
                 return self.evalExpr(self.expressions[l.right]);
+            },
+            .Set => |s| {
+                const object_val = try self.evalExpr(self.expressions[s.object]);
+                switch (object_val) {
+                    .Instance => |*i| {
+                        try @constCast(i).set(s.name.lexeme(self.source_code), s.value);
+                        return self.evalExpr(self.expressions[s.value]);
+                    },
+                    else => {
+                        self.processRuntimeError(
+                            LoxError.NoPropertyAvailable,
+                            "Only class instances have properties",
+                            s.name,
+                        );
+                        return LoxError.NoPropertyAvailable;
+                    },
+                }
             },
             .Unary => |u| {
                 const right = try self.evalExpr(self.expressions[u.expr]);

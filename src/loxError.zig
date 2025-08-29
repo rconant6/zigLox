@@ -25,8 +25,11 @@ pub const LoxError = error{
     DivisionByZero,
     InvalidBinaryOperand,
     InvalidOperands,
+    MethodNotDefined,
+    NoPropertyAvailable,
     NotCallable,
     TypeMismatch,
+    UndefinedProperty,
     UndefinedVariable,
     WrongNumberOfArguments,
     // Static Analysis Errors
