@@ -17,11 +17,16 @@ scopes: ScopeList,
 statements: []const Stmt,
 expressions: []const Expr,
 curr_function: FunctionType = .None,
+curr_class: ClassType = .None,
 
 const FunctionType = enum {
     None,
     Function,
     Method,
+};
+const ClassType = enum {
+    None,
+    Class,
 };
 
 pub fn init(allocator: std.mem.Allocator, interpreter: *Interpreter) Resolver {
@@ -48,6 +53,10 @@ fn resStmt(self: *Resolver, stmt: Stmt) LoxError!void {
             self.endScope();
         },
         .Class => |c| {
+            const enclosing_class = self.curr_class;
+            defer self.curr_class = enclosing_class;
+            self.curr_class = .Class;
+
             try self.declare(c.name);
             try self.define(c.name);
 
@@ -143,7 +152,17 @@ fn resExpr(self: *Resolver, expr: Expr) !void {
             try self.resExpr(self.expressions[s.value]);
             try self.resExpr(self.expressions[s.object]);
         },
-        .This => {
+        .This => |t| {
+            if (self.curr_class == .None) {
+                self.interpreter.diagnostics.reportError(
+                    .init(
+                        "Cannot use 'this' outside of a class",
+                        LoxError.ReturnFromTopLevel,
+                        t.keyword,
+                    ),
+                );
+                return;
+            }
             try self.resolveLocal(expr);
         },
         .Unary => |u| {
