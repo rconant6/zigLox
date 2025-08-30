@@ -27,6 +27,9 @@ pub const ClassData = struct {
 
     pub fn getMethod(self: ClassData, name: []const u8) ?RuntimeValue {
         const method = self.methods.get(name) orelse return null;
+
+        if (self.superclass) |sc| return sc.getMethod(name);
+
         return .{
             .Callable = .{
                 .Function = method,
