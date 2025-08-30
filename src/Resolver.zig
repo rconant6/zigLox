@@ -62,7 +62,6 @@ fn resStmt(self: *Resolver, stmt: Stmt) LoxError!void {
             try self.define(c.name);
 
             if (c.superclass) |sc| {
-                const superclass = self.statements[sc];
                 const super_name = c.supername.?.lexeme(self.interpreter.source_code);
                 const class_name = c.name.lexeme(self.interpreter.source_code);
 
@@ -75,7 +74,7 @@ fn resStmt(self: *Resolver, stmt: Stmt) LoxError!void {
                         ),
                     );
                 }
-                try self.resolve(superclass);
+                try self.resExpr(self.expressions[sc]);
             }
 
             try self.beginScope();

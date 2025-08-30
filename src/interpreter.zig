@@ -4,6 +4,7 @@ const ArrayList = std.ArrayList;
 const lox = @import("lox.zig");
 const out_writer = lox.out_writer;
 const Callable = lox.Callable;
+const ClassData = lox.ClassData;
 const DiagnosticReporter = lox.DiagnosticReporter;
 const Environment = lox.Environment;
 const ErrorContext = lox.ErrorContext;
@@ -94,10 +95,25 @@ pub const Interpreter = struct {
             .Class => |c| {
                 const class_name = c.name.lexeme(self.source_code);
 
-                // check for super class being a class
-                var super_tok: ?Token = null;
-                if (c.superclass) |sc|
-                    switch (self.statements[sc]) {
+                var superclass: ?*const ClassData = null;
+                if (c.superclass) |sc| {
+                    const super_expr = self.expressions[sc];
+                    const super_val = try self.evalExpr(super_expr);
+
+                    switch (super_val) {
+                        .Callable => |callable| switch (callable) {
+                            .Class => |*class_data| {
+                                superclass = class_data;
+                            },
+                            else => {
+                                self.processRuntimeError(
+                                    LoxError.SuperClassNotClass,
+                                    "Superclass must be a class",
+                                    c.name,
+                                );
+                                return LoxError.SuperClassNotClass;
+                            },
+                        },
                         else => {
                             self.processRuntimeError(
                                 LoxError.SuperClassNotClass,
@@ -106,11 +122,8 @@ pub const Interpreter = struct {
                             );
                             return LoxError.SuperClassNotClass;
                         },
-                        .Class => |scd| {
-                            super_tok = scd.supername;
-                        },
-                    };
-                const super_name = if (super_tok) |st| st.lexeme(self.source_code) else null;
+                    }
+                }
 
                 try self.environment.define(class_name, .Nil);
 
@@ -141,10 +154,6 @@ pub const Interpreter = struct {
                         },
                     }
                 }
-                const superclass = if (super_name) |sc| blk: {
-                    const class = try self.environment.get(sc);
-                    break :blk &class.Callable.Class;
-                } else null;
 
                 const new_class = RuntimeValue{
                     .Callable = .{

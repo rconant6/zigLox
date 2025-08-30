@@ -252,7 +252,11 @@ fn varDecl(self: *Parser, id: Token) LoxError!StmtIdx {
 
     if (self.match(&.{.SemiColon})) |_| {} else {
         const err_token = self.previous() orelse self.src[self.current];
-        self.parseError(LoxError.ExpectedSemiColon, "Expected ';' after variable declaration", err_token);
+        self.parseError(
+            LoxError.ExpectedSemiColon,
+            "Expected ';' after variable declaration",
+            err_token,
+        );
         return LoxError.ExpectedSemiColon;
     }
 
@@ -308,7 +312,6 @@ fn exprStatement(self: *Parser) LoxError!StmtIdx {
 }
 
 fn blockStatement(self: *Parser) LoxError!StmtIdx {
-    std.log.debug("IM IN HERE: {s}", .{self.src[self.current].lexeme(self.code)});
     var statements: ArrayList(StmtIdx) = .empty;
 
     while (!self.check(.RightBrace)) {
@@ -349,7 +352,6 @@ fn classStatement(self: *Parser) LoxError!StmtIdx {
 
     var methods: ArrayList(StmtIdx) = .empty;
     while (!self.check(.RightBrace)) {
-        std.log.debug("{any}, {s}", .{ self.src[self.current], self.src[self.current].lexeme(self.code) });
         const function = try self.functionStatement("method");
         try methods.append(self.gpa, function);
     }

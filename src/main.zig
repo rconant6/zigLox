@@ -161,6 +161,7 @@ fn processData(gpa: std.mem.Allocator, data: []const u8, env: *Environment) !u8 
         diagnostics.clearErrors();
         return lex_parse_err;
     }
+    std.log.info("SUCCESS:  Resolving Complete", .{});
 
     _ = interpreter.interpret(program) catch |err| {
         std.log.err("Runtime exited with error {}", .{err});

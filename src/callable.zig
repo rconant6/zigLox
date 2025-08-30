@@ -26,15 +26,19 @@ pub const ClassData = struct {
     methods: std.StringHashMap(FunctionData),
 
     pub fn getMethod(self: ClassData, name: []const u8) ?RuntimeValue {
-        const method = self.methods.get(name) orelse return null;
+        if (self.methods.get(name)) |method| {
+            return .{
+                .Callable = .{
+                    .Function = method,
+                },
+            };
+        }
 
-        if (self.superclass) |sc| return sc.getMethod(name);
+        if (self.superclass) |sc| {
+            return sc.getMethod(name);
+        }
 
-        return .{
-            .Callable = .{
-                .Function = method,
-            },
-        };
+        return null;
     }
 };
 

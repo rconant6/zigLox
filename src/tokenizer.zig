@@ -422,9 +422,9 @@ pub const Tokenizer = struct {
             },
 
             .end => {
-                for (tokens.items) |token| {
-                    std.debug.print("{f} {s}\n", .{ token, token.lexeme(src) });
-                }
+                // for (tokens.items) |token| {
+                //     std.debug.print("{f} {s}\n", .{ token, token.lexeme(src) });
+                // }
                 if (diagnostic.hasErrors()) {
                     tokens.deinit(gpa);
                     return LoxError.LexingError;

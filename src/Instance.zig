@@ -22,6 +22,19 @@ pub fn getMethod(self: *Instance, name: []const u8) LoxError!?RuntimeValue {
         const bound_method = try method.bind(self);
         return bound_method;
     }
+
+    if (self.class.getMethod(name)) |method| {
+        switch (method) {
+            .Callable => |callable| switch (callable) {
+                .Function => |func| {
+                    return try func.bind(self);
+                },
+                else => return null,
+            },
+            else => return null,
+        }
+    }
+
     return null;
 }
 
