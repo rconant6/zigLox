@@ -109,6 +109,7 @@ pub const Interpreter = struct {
                                 .params = f.params,
                                 .body = method_body,
                                 .closure = self.environment,
+                                .isInitializer = std.mem.eql(u8, func_name, "init"),
                             };
                             try methods.put(func_name, method_callable);
                         },

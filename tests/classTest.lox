@@ -37,6 +37,31 @@ cake.flavor = "German chocolate";
 cake.taste(); // Prints "The German chocolate cake is delicious!".
 
 
+class Foo {
+  init() {
+    print "in init()";
+    print this;
+  }
+}
+
+var foo = Foo();
+print foo.init();
+print foo;
+
+
+class Bar{
+  init() {
+    print "in bar init";
+    return;
+  }
+}
+
+var bar = Bar();
+print bar.init();
+print bar;
+
+
+
 // TEST FAILURE CASES FOR RESOLVER
 // print this;
 //fun notMethod() {

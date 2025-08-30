@@ -39,6 +39,7 @@ pub const FunctionData = struct {
     params: []const Token,
     body: Stmt,
     closure: *Environment,
+    isInitializer: bool = false,
 
     pub fn bind(self: FunctionData, instance: *Instance) LoxError!RuntimeValue {
         const env = try self.closure.gpa.create(Environment);
@@ -52,6 +53,7 @@ pub const FunctionData = struct {
                     .params = self.params,
                     .body = self.body,
                     .closure = env,
+                    .isInitializer = self.isInitializer,
                 },
             },
         };
@@ -74,17 +76,26 @@ pub const Callable = union(enum) {
         switch (self) {
             .Class => |c| {
                 const instance = try interpreter.allocator.create(Instance);
-                instance.* =
-                    .{
-                        .class = .{
-                            .name = c.name,
-                            .methods = c.methods,
-                        },
-                        .fields = std.StringHashMap(RuntimeValue).init(interpreter.allocator),
-                    };
+                instance.* = .{
+                    .class = .{
+                        .name = c.name,
+                        .methods = c.methods,
+                    },
+                    .fields = std.StringHashMap(RuntimeValue).init(interpreter.allocator),
+                };
+
+                if (c.getMethod("init")) |init| switch (init) {
+                    .Callable => |callable| {
+                        const bound_init = try callable.Function.bind(instance);
+                        _ = try bound_init.Callable.call(interpreter, arguments, src);
+                    },
+                    else => unreachable,
+                };
                 return .{ .Instance = instance };
             },
             .Function => |func| {
+                if (func.isInitializer) return func.closure.get("this");
+
                 return self.callFunction(
                     func,
                     interpreter,
@@ -101,7 +112,9 @@ pub const Callable = union(enum) {
 
     pub fn arity(self: Callable) usize {
         switch (self) {
-            .Class => return 0,
+            .Class => |c| {
+                return if (c.getMethod("init")) |init| init.Callable.arity() else 0;
+            },
             .Function => |func| return func.params.len,
             .NativeFunction => |native| return NATIVE_FUNCTIONS.get(native.name).?.arity,
         }

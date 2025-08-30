@@ -22,6 +22,7 @@ curr_class: ClassType = .None,
 const FunctionType = enum {
     None,
     Function,
+    Initializer,
     Method,
 };
 const ClassType = enum {
@@ -71,7 +72,13 @@ fn resStmt(self: *Resolver, stmt: Stmt) LoxError!void {
             defer self.curr_function = enclosing_func;
 
             for (c.methods) |method| {
-                try self.resStmt(self.statements[method]);
+                const method_stmt = self.statements[method];
+                const method_name = method_stmt.Function.name.lexeme(self.interpreter.source_code);
+
+                self.curr_function = switch (std.mem.eql(u8, method_name, "init")) {
+                    true => .Initializer,
+                    false => .Method,
+                };
             }
         },
         .Expression => |e| {
@@ -107,7 +114,19 @@ fn resStmt(self: *Resolver, stmt: Stmt) LoxError!void {
                         r.keyword,
                     ),
                 );
-            try if (r.value) |val| self.resExpr(self.expressions[val]);
+            if (r.value) |val| {
+                if (self.curr_function == .Initializer) {
+                    self.interpreter.diagnostics.reportError(
+                        .init(
+                            "Cannot return value from initializer",
+                            LoxError.InitializerReturnedValue,
+                            r.keyword,
+                        ),
+                    );
+                    return;
+                }
+                try self.resExpr(self.expressions[val]);
+            }
         },
         .Variable => |v| {
             try self.declare(v.name);

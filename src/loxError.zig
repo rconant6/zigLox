@@ -23,6 +23,7 @@ pub const LoxError = error{
     UnexpectedToken,
     // Semantic Errors
     DivisionByZero,
+    InitializerReturnedValue,
     InvalidBinaryOperand,
     InvalidOperands,
     MethodNotDefined,
