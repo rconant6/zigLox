@@ -60,26 +60,36 @@ print DevonshireCream().serveOn();
 //print bar.init();
 //print bar;
 
-
-class A {
-  method() {
-    print "A method";
+// 13.2
+class Doughnut {
+  cook() {
+    print "Fry until golden brown.";
   }
 }
 
-class B < A {
-  method() {
-    print "B method";
-  }
+class BostonCream < Doughnut {}
 
-  test() {
-    super.method();
-  }
-}
+BostonCream().cook();
 
-class C < B {}
-
-C().test();
+//class A {
+//  method() {
+//    print "A method";
+//  }
+//}
+//
+//class B < A {
+//  method() {
+//    print "B method";
+//  }
+//
+//  test() {
+//    super.method();
+//  }
+//}
+//
+//class C < B {}
+//
+//C().test();
 
 // TEST FAILURE CASES FOR RESOLVER
 // print this;
