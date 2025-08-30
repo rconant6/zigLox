@@ -162,6 +162,7 @@ pub const Stmt = union(enum) {
     Class: ParseType(struct {
         name: Token,
         superclass: ?ExprIdx,
+        supername: ?Token,
         methods: []const StmtIdx,
     }),
     Expression: ParseType(struct {
@@ -307,6 +308,7 @@ fn exprStatement(self: *Parser) LoxError!StmtIdx {
 }
 
 fn blockStatement(self: *Parser) LoxError!StmtIdx {
+    std.log.debug("IM IN HERE: {s}", .{self.src[self.current].lexeme(self.code)});
     var statements: ArrayList(StmtIdx) = .empty;
 
     while (!self.check(.RightBrace)) {
@@ -324,18 +326,40 @@ fn blockStatement(self: *Parser) LoxError!StmtIdx {
 
 fn classStatement(self: *Parser) LoxError!StmtIdx {
     const name = try self.expect(.Identifier, "Expecting class name after 'class'");
+
+    var super_class: ?ExprIdx = null;
+    var super_name: ?Token = null;
+    if (self.consume(.Less)) |_| {
+        if (self.check(.Identifier)) {
+            const super = if (self.peek()) |sup| sup else {
+                self.diagnostics.reportError(.{
+                    .errorType = LoxError.ExpectedIdentifier,
+                    .message = "Expect super class name after '<'",
+                    .sourceCode = self.code,
+                    .token = self.src[self.current],
+                });
+                return LoxError.ExpectedIdentifier;
+            };
+            super_name = super;
+            super_class = try self.expression();
+        }
+    }
+
     _ = try self.expect(.LeftBrace, "Expect '{' to open class body");
 
     var methods: ArrayList(StmtIdx) = .empty;
     while (!self.check(.RightBrace)) {
-        try methods.append(self.gpa, try self.functionStatement("method"));
+        std.log.debug("{any}, {s}", .{ self.src[self.current], self.src[self.current].lexeme(self.code) });
+        const function = try self.functionStatement("method");
+        try methods.append(self.gpa, function);
     }
 
     _ = try self.expect(.RightBrace, "Expect '}' to close class body");
 
     return self.createStmt(.{ .Class = .{
         .name = name,
-        .superclass = null,
+        .superclass = super_class,
+        .supername = super_name,
         .methods = try methods.toOwnedSlice(self.gpa),
     } });
 }

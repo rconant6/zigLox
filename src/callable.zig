@@ -22,6 +22,7 @@ const NATIVE_FUNCTIONS = std.StaticStringMap(NativeFnImpl).initComptime(.{
 
 pub const ClassData = struct {
     name: []const u8,
+    superclass: ?*const ClassData,
     methods: std.StringHashMap(FunctionData),
 
     pub fn getMethod(self: ClassData, name: []const u8) ?RuntimeValue {
@@ -79,6 +80,7 @@ pub const Callable = union(enum) {
                 instance.* = .{
                     .class = .{
                         .name = c.name,
+                        .superclass = c.superclass,
                         .methods = c.methods,
                     },
                     .fields = std.StringHashMap(RuntimeValue).init(interpreter.allocator),

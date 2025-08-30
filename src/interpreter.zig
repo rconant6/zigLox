@@ -93,6 +93,25 @@ pub const Interpreter = struct {
             },
             .Class => |c| {
                 const class_name = c.name.lexeme(self.source_code);
+
+                // check for super class being a class
+                var super_tok: ?Token = null;
+                if (c.superclass) |sc|
+                    switch (self.statements[sc]) {
+                        else => {
+                            self.processRuntimeError(
+                                LoxError.SuperClassNotClass,
+                                "Superclass must be a class",
+                                c.name,
+                            );
+                            return LoxError.SuperClassNotClass;
+                        },
+                        .Class => |scd| {
+                            super_tok = scd.supername;
+                        },
+                    };
+                const super_name = if (super_tok) |st| st.lexeme(self.source_code) else null;
+
                 try self.environment.define(class_name, .Nil);
 
                 var methods = std.StringHashMap(FunctionData).init(self.allocator);
@@ -122,10 +141,16 @@ pub const Interpreter = struct {
                         },
                     }
                 }
+                const superclass = if (super_name) |sc| blk: {
+                    const class = try self.environment.get(sc);
+                    break :blk &class.Callable.Class;
+                } else null;
+
                 const new_class = RuntimeValue{
                     .Callable = .{
                         .Class = .{
                             .name = class_name,
+                            .superclass = superclass,
                             .methods = methods,
                         },
                     },

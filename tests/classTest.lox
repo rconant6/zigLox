@@ -1,69 +1,89 @@
 
 // chapter 11
-class DevonshireCream {
-  serveOn() {
-    return "Scones";
-  }
-}
+//class DevonshireCream {
+//  serveOn() {
+//    return "Scones";
+//  }
+//}
 
 print DevonshireCream; // Prints "DevonshireCream"
 print DevonshireCream().serveOn();
 
 // chapter 11
-class Bagel {}
-var bagel = Bagel();
-print bagel; // Prints "Bagel instance"
-print Bagel;
+//class Bagel {}
+//var bagel = Bagel();
+//print bagel; // Prints "Bagel instance"
+//print Bagel;
 
 // 12.5
-class Bacon {
-  eat() {
-    print "Crunch crunch crunch!";
-  }
-}
+//class Bacon {
+//  eat() {
+//    print "Crunch crunch crunch!";
+//  }
+//}
 
-Bacon().eat(); // Prints "Crunch crunch crunch!".
+//Bacon().eat(); // Prints "Crunch crunch crunch!".
 
 // 12.6
-class Cake {
-  taste() {
-    var adjective = "delicious";
-    print "The " + this.flavor + " cake is " + adjective + "!";
+//class Cake {
+//  taste() {
+//    var adjective = "delicious";
+//    print "The " + this.flavor + " cake is " + adjective + "!";
+//  }
+//}
+
+//var cake = Cake();
+//cake.flavor = "German chocolate";
+//cake.taste(); // Prints "The German chocolate cake is delicious!".
+
+
+//class Foo {
+//  init() {
+//    print "in init()";
+//    print this;
+//  }
+//}
+//
+//var foo = Foo();
+//print foo.init();
+//print foo;
+//
+//
+//class Bar{
+//  init() {
+//    print "in bar init";
+//    return;
+//  }
+//}
+//
+//var bar = Bar();
+//print bar.init();
+//print bar;
+
+
+class A {
+  method() {
+    print "A method";
   }
 }
 
-var cake = Cake();
-cake.flavor = "German chocolate";
-cake.taste(); // Prints "The German chocolate cake is delicious!".
+class B < A {
+  method() {
+    print "B method";
+  }
 
-
-class Foo {
-  init() {
-    print "in init()";
-    print this;
+  test() {
+    super.method();
   }
 }
 
-var foo = Foo();
-print foo.init();
-print foo;
+class C < B {}
 
-
-class Bar{
-  init() {
-    print "in bar init";
-    return;
-  }
-}
-
-var bar = Bar();
-print bar.init();
-print bar;
-
-
+C().test();
 
 // TEST FAILURE CASES FOR RESOLVER
 // print this;
 //fun notMethod() {
 //  print this;
 //}
+//class A < A {}

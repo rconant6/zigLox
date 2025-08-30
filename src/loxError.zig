@@ -29,14 +29,16 @@ pub const LoxError = error{
     MethodNotDefined,
     NoPropertyAvailable,
     NotCallable,
+    SuperClassNotClass,
     TypeMismatch,
     UndefinedProperty,
     UndefinedVariable,
     WrongNumberOfArguments,
     // Static Analysis Errors
-    VariableRedeclaration,
-    SelfreferenceInitializer,
+    InheritanceCylce,
     ReturnFromTopLevel,
+    SelfreferenceInitializer,
+    VariableRedeclaration,
     // System Errors
     OutOfMemory,
     WriteFailed,
