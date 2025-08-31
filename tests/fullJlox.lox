@@ -1,0 +1,185 @@
+// Comprehensive Lox Program - Features from Chapters 1-13
+// This demonstrates all major language features implemented so far
+
+print "=== Lox Language Demo ===";
+print "";
+
+// Chapter 4-6: Basic expressions and statements
+print "1. Basic Arithmetic & Logic:";
+print 2 + 3 * 4;           // 14 (precedence)
+print (2 + 3) * 4;         // 20 (grouping)
+print 10 > 5 and 3 < 7;    // true
+print !false or nil;       // true
+print "";
+
+// Chapter 8: Variables and assignment
+print "2. Variables:";
+var message = "Hello";
+var count = 42;
+print message + " World!";
+count = count + 1;
+print "Count is now 43";
+print "";
+
+// Chapter 8: Block scoping
+print "3. Block Scoping:";
+var global = "outer";
+{
+    var local = "inner";
+    print global + " and " + local;
+    {
+        var deeper = "nested";
+        print global + " " + local + " " + deeper;
+    }
+}
+print global;
+print "";
+
+// Chapter 9: Control flow
+print "4. Control Flow:";
+var temperature = 75;
+if (temperature > 80) {
+    print "Hot day!";
+} else if (temperature > 60) {
+    print "Nice weather";
+} else {
+    print "Bundle up!";
+}
+
+print "Counting with while:";
+var i = 1;
+while (i <= 3) {
+    if (i == 1) print "Count: 1";
+    if (i == 2) print "Count: 2"; 
+    if (i == 3) print "Count: 3";
+    i = i + 1;
+}
+
+print "Counting with for:";
+for (var j = 1; j <= 3; j = j + 1) {
+    if (j == 1) print "For loop: 1";
+    if (j == 2) print "For loop: 2";
+    if (j == 3) print "For loop: 3";
+}
+print "";
+
+// Chapter 10: Functions
+print "5. Functions:";
+fun fibonacci(n) {
+    if (n <= 1) return n;
+    return fibonacci(n - 1) + fibonacci(n - 2);
+}
+
+fun greet(name, title) {
+    return "Hello, " + title + " " + name + "!";
+}
+
+var fib6 = fibonacci(6);
+print "Fibonacci of 6 is 8";
+print greet("Smith", "Dr.");
+print "";
+
+// Chapter 10: Closures
+print "6. Closures:";
+fun makeCounter(start) {
+    var count = start;
+    fun increment() {
+        count = count + 1;
+        return count;
+    }
+    return increment;
+}
+
+var counter = makeCounter(10);
+var count1 = counter();  // 11
+var count2 = counter();  // 12
+var count3 = counter();  // 13
+print "Counter results: 11, 12, 13";
+print "";
+
+// Chapter 11-12: Classes and instances
+print "7. Classes and Objects:";
+class Person {
+    init(name) {
+        this.name = name;
+    }
+    
+    sayHello() {
+        print "Hello from a person!";
+    }
+}
+
+var alice = Person("Alice");
+alice.sayHello();
+print "";
+
+// Chapter 13: Inheritance
+print "8. Inheritance:";
+class Animal {
+    init(name, sound) {
+        print "Creating an animal";
+    }
+    
+    speak() {
+        print "An animal makes a sound";
+    }
+}
+
+class Dog < Animal {
+    init(name, breed) {
+        super.init(name, "woof");
+        print "Creating a dog";
+    }
+    
+    speak() {
+        super.speak();
+        print "The dog is wagging their tail!";
+    }
+    
+    fetch() {
+        print "The dog is fetching the ball!";
+    }
+}
+
+print "Creating animals:";
+var buddy = Dog("Buddy", "Golden Retriever");
+
+print "";
+print "Animals speaking:";
+buddy.speak();
+buddy.fetch();
+print "";
+print "";
+
+// Chapter 10: Higher-order functions with closures
+print "10. Advanced Function Patterns:";
+fun applyTransform(value, transform) {
+    return transform(value);
+}
+
+fun makeMultiplier(factor) {
+    fun multiply(x) {
+        return x * factor;
+    }
+    return multiply;
+}
+
+var double = makeMultiplier(2);
+var triple = makeMultiplier(3);
+
+print "Apply transform to values:";
+var result1 = applyTransform(5, double);
+var result2 = applyTransform(4, triple);
+print "Double 5 equals 10";
+print "Triple 4 equals 12";
+print "";
+
+print "=== Demo Complete ===";
+print "This program demonstrated:";
+print "- Expressions and operators";
+print "- Variables and scoping"; 
+print "- Control flow (if/while/for)";
+print "- Functions and closures";
+print "- Classes and instances";
+print "- Inheritance with super calls";
+print "- Method overriding";

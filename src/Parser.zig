@@ -629,6 +629,7 @@ fn assignment(self: *Parser) LoxError!ExprIdx {
 
         switch (expr) {
             .Get => |g| {
+                std.log.debug("Creating a SET Expr for {s}", .{g.name.lexeme(self.code)});
                 return self.createExpr(.{
                     .Set = .{
                         .object = g.object,

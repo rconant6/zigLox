@@ -1,0 +1,396 @@
+
+// Lox Drawing Program - Points, Lines, and Canvas System
+print "=== Lox Drawing System ===";
+print "";
+
+// Point class - represents a 2D coordinate
+class Point {
+    init(x, y) {
+        this.x = x;
+        this.y = y;
+    }
+    
+    display() {
+        print "Point at coordinates";
+    }
+    
+    // Calculate distance to another point
+    distanceTo(other) {
+        var dx = this.x - other.x;
+        var dy = this.y - other.y;
+        // Simplified distance (no sqrt available)
+        return dx * dx + dy * dy;
+    }
+    
+    // Move point by offset
+    move(dx, dy) {
+        this.x = this.x + dx;
+        this.y = this.y + dy;
+    }
+    
+    // Create a copy of this point
+    copy() {
+        return Point(this.x, this.y);
+    }
+}
+
+// Line class - represents a line segment between two points
+class Line {
+    init(start, end) {
+        this.start = start;
+        this.end = end;
+    }
+    
+    display() {
+        print "Line from start to end";
+    }
+    
+    // Get the length of the line (squared, since no sqrt)
+    length() {
+        return this.start.distanceTo(this.end);
+    }
+    
+    // Get the midpoint of the line
+    midpoint() {
+        var midX = (this.start.x + this.end.x) / 2;
+        var midY = (this.start.y + this.end.y) / 2;
+        return Point(midX, midY);
+    }
+    
+    // Move the entire line by an offset
+    translate(dx, dy) {
+        this.start.move(dx, dy);
+        this.end.move(dx, dy);
+    }
+}
+
+// Canvas class - manages a collection of drawing elements
+class Canvas {
+    init(width, height) {
+        this.width = width;
+        this.height = height;
+        this.elementCount = 0;
+    }
+    
+    addElement() {
+        this.elementCount = this.elementCount + 1;
+        print "Added element to canvas";
+    }
+    
+    clear() {
+        this.elementCount = 0;
+        print "Canvas cleared";
+    }
+    
+    info() {
+        print "Canvas info displayed";
+    }
+}
+
+// Shape classes using inheritance
+class Shape {
+    init(color) {
+        this.color = color;
+    }
+    
+    draw() {
+        print "Drawing a generic shape";
+    }
+    
+    getInfo() {
+        print "Shape information";
+    }
+}
+
+class Rectangle < Shape {
+    init(topLeft, width, height, color) {
+        super.init(color);
+        this.topLeft = topLeft;
+        this.width = width;
+        this.height = height;
+    }
+    
+    draw() {
+        super.draw();
+        print "Drawing a rectangle";
+    }
+    
+    area() {
+        return this.width * this.height;
+    }
+    
+    // Get the four corners of the rectangle
+    getCorners() {
+        var tl = this.topLeft;
+        var tr = Point(tl.x + this.width, tl.y);
+        var bl = Point(tl.x, tl.y + this.height);
+        var br = Point(tl.x + this.width, tl.y + this.height);
+        return tl; // Simplified - just return one corner for demo
+    }
+}
+
+class Circle < Shape {
+    init(center, radius, color) {
+        super.init(color);
+        this.center = center;
+        this.radius = radius;
+    }
+    
+    draw() {
+        super.draw();
+        print "Drawing a circle";
+    }
+    
+    area() {
+        // Approximation of pi * r^2
+        var pi = 3.14159;
+        return pi * this.radius * this.radius;
+    }
+    
+    // Check if a point is inside the circle (simplified)
+    contains(point) {
+        var distance = this.center.distanceTo(point);
+        var radiusSquared = this.radius * this.radius;
+        return distance <= radiusSquared;
+    }
+}
+
+// Drawing application simulation
+print "1. Creating basic geometric elements:";
+var origin = Point(0, 0);
+var corner = Point(10, 10);
+origin.display();
+corner.display();
+
+var mainLine = Line(origin, corner);
+mainLine.display();
+var lineLength = mainLine.length();
+print "Line length squared: 200";
+
+print "";
+print "2. Working with transformations:";
+var movingPoint = Point(5, 5);
+movingPoint.display();
+movingPoint.move(3, 4);
+print "Point moved to new position";
+
+var shiftingLine = Line(Point(0, 0), Point(5, 5));
+shiftingLine.translate(2, 2);
+print "Line translated";
+
+print "";
+print "3. Creating shapes on canvas:";
+var canvas = Canvas(800, 600);
+canvas.info();
+
+var rect = Rectangle(Point(10, 10), 50, 30, "blue");
+canvas.addElement();
+rect.draw();
+var rectArea = rect.area();
+print "Rectangle area: 1500";
+
+var circle = Circle(Point(100, 100), 25, "red");
+canvas.addElement();
+circle.draw();
+var circleArea = circle.area();
+print "Circle area approximately: 1963";
+
+canvas.info();
+
+print "";
+print "4. Interactive drawing session:";
+print "Starting drawing session...";
+
+// Simulate drawing a house
+var houseBase = Rectangle(Point(50, 100), 100, 80, "brown");
+houseBase.draw();
+canvas.addElement();
+
+// Roof (triangle approximated with lines)
+var roofLeft = Line(Point(50, 100), Point(100, 50));
+var roofRight = Line(Point(100, 50), Point(150, 100));
+roofLeft.display();
+roofRight.display();
+canvas.addElement();
+canvas.addElement();
+
+// Door
+var door = Rectangle(Point(85, 140), 30, 40, "darkbrown");
+door.draw();
+canvas.addElement();
+
+// Windows
+var leftWindow = Circle(Point(70, 120), 8, "lightblue");
+var rightWindow = Circle(Point(130, 120), 8, "lightblue");
+leftWindow.draw();
+rightWindow.draw();
+canvas.addElement();
+canvas.addElement();
+
+print "House drawing complete!";
+canvas.info();
+
+print "";
+print "5. Collision detection simulation:";
+var testPoint = Point(75, 125);
+var windowHit = leftWindow.contains(testPoint);
+if (windowHit) {
+    print "Point hits the left window!";
+} else {
+    print "Point misses the window";
+}
+
+print "";
+print "6. Drawing tools simulation:";
+
+// Pen tool class
+class DrawingTool {
+    init(name) {
+        this.name = name;
+        this.active = false;
+    }
+    
+    activate() {
+        this.active = true;
+        print "Tool activated";
+    }
+    
+    deactivate() {
+        this.active = false;
+        print "Tool deactivated";
+    }
+    
+    use() {
+        if (this.active) {
+            print "Using drawing tool";
+        } else {
+            print "Tool not active";
+        }
+    }
+}
+
+class Pen < DrawingTool {
+    init(name, color, thickness) {
+        super.init(name);
+        this.color = color;
+        this.thickness = thickness;
+    }
+    
+    use() {
+        if (this.active) {
+            super.use();
+            print "Drawing with pen";
+        } else {
+            print "Pen not active";
+        }
+    }
+    
+    drawLine(start, end) {
+        if (this.active) {
+            var line = Line(start, end);
+            line.display();
+            print "Pen drew a line";
+        }
+    }
+}
+
+class Brush < DrawingTool {
+    init(name, color, size) {
+        super.init(name);
+        this.color = color;
+        this.size = size;
+    }
+    
+    use() {
+        if (this.active) {
+            super.use();
+            print "Painting with brush";
+        } else {
+            print "Brush not active";
+        }
+    }
+    
+    paint(center) {
+        if (this.active) {
+            var circle = Circle(center, this.size, this.color);
+            circle.draw();
+            print "Brush painted a spot";
+        }
+    }
+}
+
+// Simulate an artist using tools
+print "Artist simulation:";
+var finePen = Pen("Fine Liner", "black", 1);
+var paintBrush = Brush("Round Brush", "red", 5);
+
+finePen.activate();
+finePen.drawLine(Point(0, 0), Point(10, 10));
+finePen.drawLine(Point(10, 10), Point(20, 5));
+
+paintBrush.activate();
+paintBrush.paint(Point(15, 15));
+paintBrush.paint(Point(25, 25));
+
+finePen.deactivate();
+paintBrush.deactivate();
+
+print "";
+print "7. Drawing manager:";
+
+// Manager class to coordinate drawing operations
+class DrawingManager {
+    init() {
+        this.activeCanvas = nil;
+        this.activeTool = nil;
+    }
+    
+    setCanvas(canvas) {
+        this.activeCanvas = canvas;
+        print "Canvas set as active";
+    }
+    
+    setTool(tool) {
+        if (this.activeTool != nil) {
+            this.activeTool.deactivate();
+        }
+        this.activeTool = tool;
+        tool.activate();
+        print "Tool switched";
+    }
+    
+    drawShape(shape) {
+        if (this.activeCanvas != nil and this.activeTool != nil) {
+            shape.draw();
+            this.activeCanvas.addElement();
+            print "Shape added to canvas";
+        } else {
+            print "Cannot draw - missing canvas or tool";
+        }
+    }
+}
+
+var manager = DrawingManager();
+var artCanvas = Canvas(1024, 768);
+var pencil = Pen("Pencil", "gray", 2);
+
+manager.setCanvas(artCanvas);
+manager.setTool(pencil);
+
+var square = Rectangle(Point(100, 100), 50, 50, "blue");
+var dot = Circle(Point(200, 200), 3, "black");
+
+manager.drawShape(square);
+manager.drawShape(dot);
+
+print "";
+print "=== Drawing Session Complete ===";
+artCanvas.info();
+print "Created a functional drawing system with:";
+print "- Point and Line geometry";
+print "- Shape inheritance hierarchy";
+print "- Canvas management";
+print "- Drawing tools with state";
+print "- Manager pattern for coordination";
+print "- Collision detection";
+print "- Object composition and interaction";

@@ -299,6 +299,7 @@ pub const Interpreter = struct {
                 const object_val = try self.evalExpr(self.expressions[s.object]);
                 switch (object_val) {
                     .Instance => |i| {
+                        std.log.debug("Class: {s} InstanceSET: {*}", .{ i.class.name, i });
                         const value = try self.evalExpr(self.expressions[s.value]);
                         try i.set(s.name.lexeme(self.source_code), value);
                         return value;
@@ -354,6 +355,8 @@ pub const Interpreter = struct {
                     for (0..distance) |_| {
                         env = env.parent orelse return LoxError.UndefinedVariable;
                     }
+                    const i = try env.get("this");
+                    std.log.debug("Class: {s} InstanceTHIS: {*}", .{ i.Instance.class.name, i.Instance });
                     return env.get("this");
                 } else {
                     return self.environment.get("this");

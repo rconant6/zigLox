@@ -11,7 +11,8 @@ const RuntimeValue = lox.RuntimeValue;
 class: ClassData,
 fields: std.StringHashMap(RuntimeValue),
 
-pub fn get(self: Instance, name: []const u8) LoxError!?RuntimeValue {
+pub fn get(self: *const Instance, name: []const u8) LoxError!?RuntimeValue {
+    std.log.debug("Instance.get: looking for '{s}', fields has {d} items", .{ name, self.fields.count() });
     if (self.fields.get(name)) |field| return field;
 
     return null;
@@ -39,7 +40,8 @@ pub fn getMethod(self: *Instance, name: []const u8) LoxError!?RuntimeValue {
 }
 
 pub fn set(self: *Instance, name: []const u8, value: RuntimeValue) LoxError!void {
-    return self.fields.put(name, value);
+    std.log.debug("Instance.set: storing '{s}' in fields", .{name});
+    try self.fields.put(name, value);
 }
 
 pub fn format(self: Instance, w: *std.Io.Writer) !void {

@@ -54,6 +54,8 @@ pub const FunctionData = struct {
         env.* = Environment.createLocalEnv(self.closure);
         try env.define("this", RuntimeValue{ .Instance = instance });
 
+        std.log.debug("Class: {s} InstanceBind: {*}", .{ instance.class.name, instance });
+
         return RuntimeValue{
             .Callable = .{
                 .Function = .{
