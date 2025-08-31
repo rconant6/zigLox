@@ -599,6 +599,10 @@ pub const Expr = union(enum) {
         name: Token,
         value: ExprIdx,
     }),
+    Super: ParseType(struct {
+        keyword: Token,
+        method: Token,
+    }),
     This: ParseType(struct {
         keyword: Token,
     }),
@@ -783,6 +787,16 @@ pub fn primary(self: *Parser) LoxError!ExprIdx {
             self.advance();
 
             return self.createExpr(.{ .Variable = .{ .name = token } });
+        },
+        .Super => {
+            const keyword = self.src[self.current];
+            self.advance();
+            _ = try self.expect(.Dot, "Exepect '.' after 'super'");
+            const method = try self.expect(.Identifier, "Expect superclass method name");
+            return self.createExpr(.{ .Super = .{
+                .keyword = keyword,
+                .method = method,
+            } });
         },
         else => {
             const err_token = self.previous() orelse self.src[self.current];

@@ -27,7 +27,6 @@ pub fn main() !void {
 
     var arena_alloc = std.heap.ArenaAllocator.init(allocator);
     const arena = arena_alloc.allocator();
-    errdefer arena_alloc.deinit();
     defer arena_alloc.deinit();
 
     const args = try std.process.argsAlloc(allocator);

@@ -57,6 +57,8 @@ pub const Interpreter = struct {
         const token = switch (expr) {
             .Assign => |a| a.name,
             .Variable => |v| v.name,
+            .This => |t| t.keyword,
+            .Super => |s| s.keyword,
             else => return,
         };
         try self.locals.put(self.allocator, token, depth);
@@ -99,59 +101,46 @@ pub const Interpreter = struct {
                 if (c.superclass) |sc| {
                     const super_expr = self.expressions[sc];
                     const super_val = try self.evalExpr(super_expr);
-
                     switch (super_val) {
                         .Callable => |callable| switch (callable) {
                             .Class => |*class_data| {
                                 superclass = class_data;
                             },
-                            else => {
-                                self.processRuntimeError(
-                                    LoxError.SuperClassNotClass,
-                                    "Superclass must be a class",
-                                    c.name,
-                                );
-                                return LoxError.SuperClassNotClass;
-                            },
+                            else => return LoxError.SuperClassNotClass,
                         },
-                        else => {
-                            self.processRuntimeError(
-                                LoxError.SuperClassNotClass,
-                                "Superclass must be a class",
-                                c.name,
-                            );
-                            return LoxError.SuperClassNotClass;
-                        },
+                        else => return LoxError.SuperClassNotClass,
                     }
                 }
 
                 try self.environment.define(class_name, .Nil);
 
                 var methods = std.StringHashMap(FunctionData).init(self.allocator);
-
                 for (c.methods) |method_idx| {
                     const method_stmt = self.statements[method_idx];
-
                     switch (method_stmt) {
                         .Function => |f| {
                             const func_name = f.name.lexeme(self.source_code);
                             const method_body = self.statements[f.body];
+
+                            const closure_env = if (superclass) |sc| blk: {
+                                const super_env = try self.allocator.create(Environment);
+                                super_env.* = Environment.createLocalEnv(self.environment);
+                                try super_env.define("super", RuntimeValue{
+                                    .Callable = .{ .Class = sc.* },
+                                });
+                                break :blk super_env;
+                            } else self.environment;
+
                             const method_callable = FunctionData{
                                 .name = func_name,
                                 .params = f.params,
                                 .body = method_body,
-                                .closure = self.environment,
+                                .closure = closure_env,
                                 .isInitializer = std.mem.eql(u8, func_name, "init"),
                             };
                             try methods.put(func_name, method_callable);
                         },
-                        else => {
-                            self.processRuntimeError(
-                                LoxError.NotCallable,
-                                "Methods must be functions",
-                                c.name,
-                            );
-                        },
+                        else => return LoxError.NotCallable,
                     }
                 }
 
@@ -324,6 +313,41 @@ pub const Interpreter = struct {
                     },
                 }
             },
+            .Super => |s| {
+                const distance = self.locals.get(s.keyword) orelse {
+                    return LoxError.UndefinedVariable;
+                };
+
+                var env = self.environment;
+                for (0..distance) |_| {
+                    env = env.parent orelse return LoxError.UndefinedVariable;
+                }
+                const superclass = env.get("super") catch {
+                    return LoxError.UndefinedVariable;
+                };
+
+                var this_env = self.environment;
+                for (0..distance - 1) |_| {
+                    this_env = this_env.parent orelse return LoxError.UndefinedVariable;
+                }
+                const this = this_env.get("this") catch {
+                    return LoxError.UndefinedVariable;
+                };
+
+                const method_name = s.method.lexeme(self.source_code);
+                switch (superclass) {
+                    .Callable => |callable| switch (callable) {
+                        .Class => |class| {
+                            if (class.getMethod(method_name)) |method| {
+                                return method.Callable.Function.bind(this.Instance);
+                            }
+                            return LoxError.UndefinedProperty;
+                        },
+                        else => return LoxError.SuperClassNotClass,
+                    },
+                    else => return LoxError.SuperClassNotClass,
+                }
+            },
             .This => |t| {
                 if (self.locals.get(t.keyword)) |distance| {
                     var env = self.environment;
@@ -332,7 +356,7 @@ pub const Interpreter = struct {
                     }
                     return env.get("this");
                 } else {
-                    return self.environment.get("this"); // Global vars
+                    return self.environment.get("this");
                 }
             },
             .Unary => |u| {

@@ -28,6 +28,7 @@ const FunctionType = enum {
 const ClassType = enum {
     None,
     Class,
+    Subclass,
 };
 
 pub fn init(allocator: std.mem.Allocator, interpreter: *Interpreter) Resolver {
@@ -62,6 +63,7 @@ fn resStmt(self: *Resolver, stmt: Stmt) LoxError!void {
             try self.define(c.name);
 
             if (c.superclass) |sc| {
+                self.curr_class = .Subclass;
                 const super_name = c.supername.?.lexeme(self.interpreter.source_code);
                 const class_name = c.name.lexeme(self.interpreter.source_code);
 
@@ -75,27 +77,31 @@ fn resStmt(self: *Resolver, stmt: Stmt) LoxError!void {
                     );
                 }
                 try self.resExpr(self.expressions[sc]);
+                try self.beginScope();
+                const super_scope_idx = self.scopes.items.len - 1;
+                try self.scopes.items[super_scope_idx].put("super", true);
             }
 
             try self.beginScope();
-            defer self.endScope();
-
-            var env = self.scopes.getLast();
-            try env.put("this", true);
-
+            const this_scope_idx = self.scopes.items.len - 1;
+            try self.scopes.items[this_scope_idx].put("this", true);
             const enclosing_func = self.curr_function;
-            self.curr_function = .Method;
             defer self.curr_function = enclosing_func;
 
             for (c.methods) |method| {
                 const method_stmt = self.statements[method];
                 const method_name = method_stmt.Function.name.lexeme(self.interpreter.source_code);
 
-                self.curr_function = switch (std.mem.eql(u8, method_name, "init")) {
-                    true => .Initializer,
-                    false => .Method,
-                };
+                self.curr_function = if (std.mem.eql(u8, method_name, "init"))
+                    .Initializer
+                else
+                    .Method;
+
+                try self.resStmt(method_stmt);
             }
+
+            self.endScope(); // this scope
+            if (c.superclass) |_| self.endScope(); // super scope if there is one
         },
         .Expression => |e| {
             try self.resExpr(self.expressions[e.value]);
@@ -187,6 +193,25 @@ fn resExpr(self: *Resolver, expr: Expr) !void {
             try self.resExpr(self.expressions[s.value]);
             try self.resExpr(self.expressions[s.object]);
         },
+        .Super => |s| {
+            return switch (self.curr_class) {
+                .None => self.interpreter.diagnostics.reportError(
+                    .init(
+                        "Cannot use 'super' outside of a class",
+                        LoxError.NotInSubClass,
+                        s.keyword,
+                    ),
+                ),
+                .Class => self.interpreter.diagnostics.reportError(
+                    .init(
+                        "Cannot use 'super' without a super class",
+                        LoxError.NoSuperClassDefined,
+                        s.keyword,
+                    ),
+                ),
+                else => try self.resolveLocal(expr),
+            };
+        },
         .This => |t| {
             if (self.curr_class == .None) {
                 self.interpreter.diagnostics.reportError(
@@ -223,18 +248,18 @@ fn resExpr(self: *Resolver, expr: Expr) !void {
 
 // MARK: Scope stuff
 fn resolveLocal(self: *Resolver, expr: Expr) !void {
-    var idx = self.scopes.items.len - 1;
     const name = switch (expr) {
         .Assign => |a| self.getName(a.name),
         .Variable => |v| self.getName(v.name),
         .This => |t| self.getName(t.keyword),
+        .Super => |s| self.getName(s.keyword),
         else => return LoxError.UnexpectedToken,
     };
 
-    while (idx > 0) {
-        idx -= 1;
+    for (0..self.scopes.items.len) |i| {
+        const idx = self.scopes.items.len - 1 - i;
         if (self.scopes.items[idx].contains(name)) {
-            try self.interpreter.resolve(expr, self.scopes.items.len - 1 - idx);
+            try self.interpreter.resolve(expr, i);
             return;
         }
     }

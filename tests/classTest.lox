@@ -59,36 +59,21 @@ var bar = Bar();
 print bar.init();
 print bar;
 
-// 13.2
+//13.3 (adding super)
 class Doughnut {
   cook() {
     print "Fry until golden brown.";
   }
 }
 
-class BostonCream < Doughnut {}
+class BostonCream < Doughnut {
+  cook() {
+    super.cook();
+    print "Pipe full of custard and coat with chocolate.";
+  }
+}
 
 BostonCream().cook();
-
-//class A {
-//  method() {
-//    print "A method";
-//  }
-//}
-//
-//class B < A {
-//  method() {
-//    print "B method";
-//  }
-//
-//  test() {
-//    super.method();
-//  }
-//}
-//
-//class C < B {}
-//
-//C().test();
 
 // TEST FAILURE CASES FOR RESOLVER
 // print this;
@@ -96,3 +81,11 @@ BostonCream().cook();
 //  print this;
 //}
 //class A < A {}
+//super.notEvenInAClass();
+//class Eclair {
+//  cook() {
+//    super.cook();
+//    print "Pipe full of crème pâtissière.";
+//  }
+//}
+
