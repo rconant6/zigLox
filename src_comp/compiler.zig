@@ -1,59 +1,91 @@
 const std = @import("std");
 
+const Value = f64;
+const simple_len = 1;
+const constant_len = 2;
+
 pub fn main() !u8 {
     const gpa = std.heap.smp_allocator;
 
-    var chunks = Chunk.init();
-    defer chunks.deinit(gpa);
+    var chunk = Chunk.init(gpa);
+    defer chunk.deinit();
 
-    writeChunk(gpa, &chunks, .Return);
+    writeChunk(&chunk, @intFromEnum(OpCode.Return));
+    const constant = addConstant(&chunk, 1.2);
+    writeChunk(&chunk, @intFromEnum(OpCode.Constant));
+    writeChunk(&chunk, constant);
 
-    chunks.disassembleChunk("test chunk");
+    chunk.disassembleChunk("test chunk");
 
     return 0;
 }
 
-fn writeChunk(alloc: std.mem.Allocator, chunk: *Chunk, opCode: OpCode) void {
-    chunk.code.append(alloc, opCode) catch {
-        @panic("Falied to write a chunk");
+fn writeChunk(chunk: *Chunk, byte: u8) void {
+    chunk.code.append(chunk.gpa, byte) catch |err| {
+        std.log.err("Unable to Chunk.writeChunk: {any}", .{err});
     };
+}
+fn addConstant(chunk: *Chunk, value: Value) u8 {
+    chunk.constants.append(chunk.gpa, value) catch |err| {
+        std.log.err("Unable to Chunk.addConstant: {any}", .{err});
+    };
+
+    return @intCast(chunk.constants.items.len - 1);
 }
 
 const OpCode = enum(u8) {
+    Constant,
     Return,
 };
 
 const Chunk = struct {
-    code: std.ArrayList(OpCode),
+    gpa: std.mem.Allocator,
+    code: std.ArrayList(u8),
+    constants: std.ArrayList(Value),
 
     pub fn disassembleChunk(self: *Chunk, name: []const u8) void {
         std.debug.print("== {s} ==\n", .{name});
 
-        for (0..self.code.items.len) |i| {
-            _ = self.disassembleInstruction(i);
+        var idx: usize = 0;
+        while (idx < self.code.items.len) {
+            idx = self.disassembleInstruction(idx);
         }
     }
+    fn disassembleInstruction(self: *const Chunk, offset: usize) usize {
+        std.debug.print("{d:0>4} ", .{offset}); // just the instruction code at this point?
+        const instruction: OpCode = @enumFromInt(self.code.items[offset]);
 
-    pub fn disassembleInstruction(self: *const Chunk, offset: usize) usize {
-        std.debug.print("{d:0>4} ", .{offset});
-        const instruction = self.code.items[offset];
-
-        switch (instruction) {
-            .Return => return simpleInstruction(instruction, offset),
-        }
-    }
-
-    fn simpleInstruction(op: OpCode, offset: usize) usize {
-        std.debug.print("{t}\n", .{op});
-        return offset + 1;
-    }
-
-    pub fn init() Chunk {
-        return .{
-            .code = .empty,
+        return switch (instruction) {
+            .Constant => |c| self.constantInstruction(c, offset),
+            .Return => |r| self.simpleInstruction(r, offset),
         };
     }
-    pub fn deinit(self: *Chunk, alloc: std.mem.Allocator) void {
-        self.code.deinit(alloc);
+    fn constantInstruction(self: *const Chunk, op: OpCode, offset: usize) usize {
+        std.debug.assert(offset + 1 < self.code.items.len);
+
+        const constant_idx = self.code.items[offset + 1];
+
+        std.debug.print(
+            "{t:<16}{d}\n",
+            .{ op, self.constants.items[constant_idx] },
+        );
+        return offset + constant_len;
+    }
+    fn simpleInstruction(self: *const Chunk, op: OpCode, offset: usize) usize {
+        _ = self;
+        std.debug.print("{t:<16}\n", .{op});
+        return offset + simple_len;
+    }
+
+    pub fn init(alloc: std.mem.Allocator) Chunk {
+        return .{
+            .gpa = alloc,
+            .code = .empty,
+            .constants = .empty,
+        };
+    }
+    pub fn deinit(self: *Chunk) void {
+        self.code.deinit(self.gpa);
+        self.constants.deinit(self.gpa);
     }
 };
