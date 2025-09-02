@@ -10,8 +10,13 @@ pub const InterpretResult = enum {
 };
 
 pub const OpCode = enum(u8) {
+    Add,
     Constant,
+    Divide,
+    Multiply,
+    Negate,
     Return,
+    Subtract,
 
     pub const SIMPLE_LEN = 1;
     pub const CONSTANT_LEN = 2;

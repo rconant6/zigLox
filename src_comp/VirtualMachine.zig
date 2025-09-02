@@ -15,16 +15,59 @@ stack: std.ArrayList(Value),
 
 pub fn interpret(self: *VirtualMachine, chunk: *Chunk) InterpretResult {
     var ip: usize = 0;
+    var instruction = readOp(chunk.code.items, &ip);
 
-    vm: switch (readOp(chunk.code.items, &ip)) {
+    vm: switch (instruction) {
+        .Add => {
+            trace("Binary OP: {s}\n", .{"+"});
+            self.binaryOp(struct {
+                fn add(a: f64, b: f64) f64 {
+                    return a + b;
+                }
+            }.add);
+
+            instruction = readOp(chunk.code.items, &ip);
+            continue :vm instruction;
+        },
+        .Subtract => {
+            trace("Binary OP: {s}\n", .{"-"});
+            self.binaryOp(struct {
+                fn sub(a: f64, b: f64) f64 {
+                    return a - b;
+                }
+            }.sub);
+            continue :vm readOp(chunk.code.items, &ip);
+        },
+        .Multiply => {
+            trace("Binary OP: {s}\n", .{"*"});
+            self.binaryOp(struct {
+                fn mul(a: f64, b: f64) f64 {
+                    return a * b;
+                }
+            }.mul);
+            continue :vm readOp(chunk.code.items, &ip);
+        },
+        .Divide => {
+            trace("Binary OP: {s}\n", .{"/"});
+            self.binaryOp(struct {
+                fn div(a: f64, b: f64) f64 {
+                    return a / b;
+                }
+            }.div);
+            continue :vm readOp(chunk.code.items, &ip);
+        },
         .Constant => {
             const constant = readConstant(chunk.code.items, &ip, chunk);
             trace("Constant OP: {d}\n", .{constant});
             self.push(constant);
             continue :vm readOp(chunk.code.items, &ip);
         },
+        .Negate => {
+            self.push(-self.pop());
+            continue :vm readOp(chunk.code.items, &ip);
+        },
         .Return => {
-            std.debug.print("RETURN: {d}\n", .{self.pop()});
+            std.debug.print("{d}\n", .{self.pop()});
             return .Ok;
         },
     }
@@ -40,13 +83,18 @@ inline fn readOp(bytecode: []u8, ip: *usize) OpCode {
     return result;
 }
 
+fn binaryOp(self: *VirtualMachine, comptime op: fn (f64, f64) f64) void {
+    const b = self.pop();
+    const a = self.pop();
+    self.push(op(a, b));
+}
+
 pub fn init(alloc: std.mem.Allocator) VirtualMachine {
     return .{
         .gpa = alloc,
         .stack = .empty,
     };
 }
-
 pub fn deinit(vm: *VirtualMachine) void {
     vm.stack.deinit(vm.gpa);
     return;

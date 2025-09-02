@@ -15,14 +15,29 @@ pub fn main() !u8 {
     var chunk = Chunk.init(gpa);
     defer chunk.deinit();
 
-    const constant = chunk.addConstant(1.2);
+    var constant = chunk.addConstant(1.2);
     chunk.writeChunk(@intFromEnum(OpCode.Constant), 123);
     chunk.writeChunk(constant, 123);
+
+    constant = chunk.addConstant(3.4);
+    chunk.writeChunk(@intFromEnum(OpCode.Constant), 123);
+    chunk.writeChunk(constant, 123);
+
+    chunk.writeChunk(@intFromEnum(OpCode.Add), 123);
+
+    constant = chunk.addConstant(5.6);
+    chunk.writeChunk(@intFromEnum(OpCode.Constant), 123);
+    chunk.writeChunk(constant, 123);
+
+    chunk.writeChunk(@intFromEnum(OpCode.Divide), 123);
+    chunk.writeChunk(@intFromEnum(OpCode.Negate), 123);
     chunk.writeChunk(@intFromEnum(OpCode.Return), 123);
     chunk.disassembleChunk("test chunk");
 
     const res = vm.interpret(&chunk);
-    std.debug.print("{}\n", .{res});
-
+    if (res != .Ok) {
+        std.log.err("There was an error in compiling", .{});
+        return 1;
+    }
     return 0;
 }

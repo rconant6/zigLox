@@ -44,7 +44,9 @@ fn disassembleInstruction(self: *const Chunk, offset: usize) usize {
         std.debug.print("{d:4>} ", .{self.lines.items[offset]});
     return switch (instruction) {
         .Constant => |c| self.constantInstruction(c, offset),
+        .Negate => |n| self.simpleInstruction(n, offset),
         .Return => |r| self.simpleInstruction(r, offset),
+        .Add, .Divide, .Multiply, .Subtract => |o| self.simpleInstruction(o, offset),
     };
 }
 fn constantInstruction(self: *const Chunk, op: OpCode, offset: usize) usize {
