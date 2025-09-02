@@ -8,10 +8,10 @@ const VirtualMachine = lox.VirtualMachine;
 
 pub fn main() !u8 {
     const gpa = std.heap.smp_allocator;
-    var vm: VirtualMachine = .init();
+    var vm: VirtualMachine = .init(gpa);
     defer vm.deinit();
 
-    // Just a hand rolled thing for now
+    // Just a hand rolled thing tester for now
     var chunk = Chunk.init(gpa);
     defer chunk.deinit();
 

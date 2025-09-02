@@ -54,7 +54,7 @@ pub inline fn traceBytecode(comptime fmt: []const u8, args: anytype) void {
     }
 }
 
-/// Generic trace functions (same as interpreter version)
+/// Generic trace functions
 pub inline fn traceWithTime(comptime fmt: []const u8, args: anytype) void {
     if (comptime DEBUG_TRACE_EXECUTION) {
         const timestamp = std.time.milliTimestamp();
