@@ -62,7 +62,7 @@ pub fn build(b: *std.Build) void {
     // ===== COMPILER (Bytecode VM) =====
 
     const comp_module = b.createModule(.{
-        .root_source_file = b.path("src_comp/compiler.zig"),
+        .root_source_file = b.path("src_comp/main.zig"),
         .target = target,
         .optimize = optimize,
     });
