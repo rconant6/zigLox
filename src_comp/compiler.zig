@@ -1,43 +1,30 @@
+pub const Compiler = @This();
+
 const std = @import("std");
-
 const lox = @import("lox.zig");
-const Chunk = lox.Chunk;
-const OpCode = lox.OpCode;
-const Value = lox.Value;
-const VirtualMachine = lox.VirtualMachine;
+const Scanner = lox.Scanner;
 
-pub fn main() !u8 {
-    const gpa = std.heap.smp_allocator;
-    var vm: VirtualMachine = .init(gpa);
-    defer vm.deinit();
+pub fn compile(src: []const u8) !void {
+    var scanner: Scanner = .init(src[0..]);
 
-    // Just a hand rolled thing tester for now
-    var chunk = Chunk.init(gpa);
-    defer chunk.deinit();
+    var line: u32 = 0;
+    while (true) {
+        const token = scanner.getToken() catch |err| {
+            const err_data = scanner.scan_error.?;
+            std.debug.print(
+                "[SCANNER] exited with error {any} at {f}, and msg: {s}",
+                .{ err, err_data.src, err_data.msg },
+            );
+            return err;
+        };
+        if (token.src_loc.line != line) {
+            std.debug.print("{d:4} ", .{token.src_loc.line});
+            line = token.src_loc.line;
+        } else {
+            std.debug.print("   | ", .{});
+        }
+        std.debug.print("{t} '{s}'\n", .{ token.tag, token.lexeme(src) });
 
-    var constant = chunk.addConstant(1.2);
-    chunk.writeChunk(@intFromEnum(OpCode.Constant), 123);
-    chunk.writeChunk(constant, 123);
-
-    constant = chunk.addConstant(3.4);
-    chunk.writeChunk(@intFromEnum(OpCode.Constant), 123);
-    chunk.writeChunk(constant, 123);
-
-    chunk.writeChunk(@intFromEnum(OpCode.Add), 123);
-
-    constant = chunk.addConstant(5.6);
-    chunk.writeChunk(@intFromEnum(OpCode.Constant), 123);
-    chunk.writeChunk(constant, 123);
-
-    chunk.writeChunk(@intFromEnum(OpCode.Divide), 123);
-    chunk.writeChunk(@intFromEnum(OpCode.Negate), 123);
-    chunk.writeChunk(@intFromEnum(OpCode.Return), 123);
-    chunk.disassembleChunk("test chunk");
-
-    const res = vm.interpret(&chunk);
-    if (res != .Ok) {
-        std.log.err("There was an error in compiling", .{});
-        return 1;
+        if (token.tag == .Eof) break;
     }
-    return 0;
 }

@@ -3,6 +3,7 @@ pub const VirtualMachine = @This();
 const std = @import("std");
 const lox = @import("lox.zig");
 const Chunk = lox.Chunk;
+const Compiler = lox.Compiler;
 const InterpretResult = lox.InterpretResult;
 const OpCode = lox.OpCode;
 const Value = lox.Value;
@@ -13,64 +14,73 @@ const trace = Tracer.trace;
 gpa: std.mem.Allocator,
 stack: std.ArrayList(Value),
 
-pub fn interpret(self: *VirtualMachine, chunk: *Chunk) InterpretResult {
-    var ip: usize = 0;
-    var instruction = readOp(chunk.code.items, &ip);
+pub fn interpret(self: *VirtualMachine, src: []const u8) !InterpretResult {
+    _ = self;
+    // var ip: usize = 0;
+    // var chunk: Chunk = .init(self.gpa);
 
-    vm: switch (instruction) {
-        .Add => {
-            trace("Binary OP: {s}\n", .{"+"});
-            self.binaryOp(struct {
-                fn add(a: f64, b: f64) f64 {
-                    return a + b;
-                }
-            }.add);
+    Compiler.compile(src[0..]) catch {
+        // Print out the error
+        return error.CompilerError;
+    };
+    return .{ .Ok = {} };
 
-            instruction = readOp(chunk.code.items, &ip);
-            continue :vm instruction;
-        },
-        .Subtract => {
-            trace("Binary OP: {s}\n", .{"-"});
-            self.binaryOp(struct {
-                fn sub(a: f64, b: f64) f64 {
-                    return a - b;
-                }
-            }.sub);
-            continue :vm readOp(chunk.code.items, &ip);
-        },
-        .Multiply => {
-            trace("Binary OP: {s}\n", .{"*"});
-            self.binaryOp(struct {
-                fn mul(a: f64, b: f64) f64 {
-                    return a * b;
-                }
-            }.mul);
-            continue :vm readOp(chunk.code.items, &ip);
-        },
-        .Divide => {
-            trace("Binary OP: {s}\n", .{"/"});
-            self.binaryOp(struct {
-                fn div(a: f64, b: f64) f64 {
-                    return a / b;
-                }
-            }.div);
-            continue :vm readOp(chunk.code.items, &ip);
-        },
-        .Constant => {
-            const constant = readConstant(chunk.code.items, &ip, chunk);
-            trace("Constant OP: {d}\n", .{constant});
-            self.push(constant);
-            continue :vm readOp(chunk.code.items, &ip);
-        },
-        .Negate => {
-            self.push(-self.pop());
-            continue :vm readOp(chunk.code.items, &ip);
-        },
-        .Return => {
-            std.debug.print("{d}\n", .{self.pop()});
-            return .Ok;
-        },
-    }
+    // var instruction = readOp(chunk.code.items, &ip);
+
+    // vm: switch (instruction) {
+    //     .Add => {
+    //         trace("Binary OP: {s}\n", .{"+"});
+    //         self.binaryOp(struct {
+    //             fn add(a: f64, b: f64) f64 {
+    //                 return a + b;
+    //             }
+    //         }.add);
+
+    //         instruction = readOp(chunk.code.items, &ip);
+    //         continue :vm instruction;
+    //     },
+    //     .Subtract => {
+    //         trace("Binary OP: {s}\n", .{"-"});
+    //         self.binaryOp(struct {
+    //             fn sub(a: f64, b: f64) f64 {
+    //                 return a - b;
+    //             }
+    //         }.sub);
+    //         continue :vm readOp(chunk.code.items, &ip);
+    //     },
+    //     .Multiply => {
+    //         trace("Binary OP: {s}\n", .{"*"});
+    //         self.binaryOp(struct {
+    //             fn mul(a: f64, b: f64) f64 {
+    //                 return a * b;
+    //             }
+    //         }.mul);
+    //         continue :vm readOp(chunk.code.items, &ip);
+    //     },
+    //     .Divide => {
+    //         trace("Binary OP: {s}\n", .{"/"});
+    //         self.binaryOp(struct {
+    //             fn div(a: f64, b: f64) f64 {
+    //                 return a / b;
+    //             }
+    //         }.div);
+    //         continue :vm readOp(chunk.code.items, &ip);
+    //     },
+    //     .Constant => {
+    //         const constant = readConstant(chunk.code.items, &ip, chunk);
+    //         trace("Constant OP: {d}\n", .{constant});
+    //         self.push(constant);
+    //         continue :vm readOp(chunk.code.items, &ip);
+    //     },
+    //     .Negate => {
+    //         self.push(-self.pop());
+    //         continue :vm readOp(chunk.code.items, &ip);
+    //     },
+    //     .Return => {
+    //         std.debug.print("{d}\n", .{self.pop()});
+    //         return .Ok;
+    //     },
+    // }
 }
 inline fn readConstant(bytecode: []u8, ip: *usize, chunk: *const Chunk) Value {
     const val_idx = bytecode[ip.*];
