@@ -37,6 +37,24 @@ pub fn compile(self: *Compiler, chunk: *Chunk) InterpretResult {
         .{ .Ok = {} };
 }
 
+fn emitByte(self: *Compiler, chunk: *Chunk, byte: u8) void {
+    chunk.writeChunk(byte, self.parser.previous.src_loc.line);
+}
+fn emitBytes(self: *Compiler, chunk: *Chunk, byte1: u8, byte2: u8) void {
+    chunk.writeChunk(byte1, self.parser.previous.src_loc.line);
+    chunk.writeChunk(byte2, self.parser.previous.src_loc.line);
+}
+
+fn endCompiler(self: *Compiler) void {
+    self.emitReturn();
+}
+
+fn emitReturn(self: *Compiler) void {
+    self.emitByte(.Return);
+}
+
+fn expression() void {}
+
 fn advance(self: *Compiler) void {
     self.parser.previous = self.parser.current;
 
@@ -68,8 +86,6 @@ fn advance(self: *Compiler) void {
         }
     }
 }
-
-fn expression() void {}
 fn expect(self: *Compiler, tag: Token.Tag, msg: []const u8) void {
     if (self.parser.current.tag == tag) {
         self.advance();
