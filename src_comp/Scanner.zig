@@ -115,7 +115,7 @@ const State = enum {
 
 pub fn getToken(
     self: *Scanner,
-) !Token {
+) Token {
     var tok: Token = .{
         .tag = .Invalid,
         .loc = .{ .start = 0, .end = 0 },
@@ -211,7 +211,6 @@ pub fn getToken(
             0 => {
                 self.endToken(&tok);
                 tok.tag = .Invalid;
-                tok.tag = .Eof;
                 self.startToken(&tok);
                 self.endToken(&tok);
                 self.scan_error = .{
@@ -281,9 +280,6 @@ pub fn getToken(
             },
         },
         .end => {
-            if (self.scan_error != null or tok.tag == .Invalid) {
-                return error.ScannerError;
-            }
             return tok;
         },
     }

@@ -14,16 +14,14 @@ const trace = Tracer.trace;
 gpa: std.mem.Allocator,
 stack: std.ArrayList(Value),
 
-pub fn interpret(self: *VirtualMachine, src: []const u8) !InterpretResult {
-    _ = self;
+pub fn interpret(self: *VirtualMachine, src: []const u8) InterpretResult {
     // var ip: usize = 0;
-    // var chunk: Chunk = .init(self.gpa);
+    var chunk: Chunk = .init(self.gpa);
+    defer chunk.deinit();
 
-    Compiler.compile(src[0..]) catch {
-        // Print out the error
-        return error.CompilerError;
-    };
-    return .{ .Ok = {} };
+    var compiler: Compiler = .init(src[0..]);
+    const compiler_result = compiler.compile(&chunk);
+    return compiler_result;
 
     // var instruction = readOp(chunk.code.items, &ip);
 
@@ -92,7 +90,6 @@ inline fn readOp(bytecode: []u8, ip: *usize) OpCode {
     ip.* += 1;
     return result;
 }
-
 fn binaryOp(self: *VirtualMachine, comptime op: fn (f64, f64) f64) void {
     const b = self.pop();
     const a = self.pop();

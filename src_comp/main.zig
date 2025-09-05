@@ -49,7 +49,7 @@ fn runFile(allocator: std.mem.Allocator, vm: *VirtualMachine, path: []const u8) 
     const source = try readFile(allocator, path);
     defer allocator.free(source);
 
-    return try vm.interpret(source);
+    return vm.interpret(source);
 }
 
 fn repl(allocator: std.mem.Allocator, vm: *VirtualMachine) !void {
@@ -71,7 +71,7 @@ fn repl(allocator: std.mem.Allocator, vm: *VirtualMachine) !void {
             continue;
         }
 
-        _ = try vm.interpret(lines.items);
+        _ = vm.interpret(lines.items);
         lines.clearRetainingCapacity();
     }
 }

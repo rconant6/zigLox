@@ -2,29 +2,89 @@ pub const Compiler = @This();
 
 const std = @import("std");
 const lox = @import("lox.zig");
+const Chunk = lox.Chunk;
+const InterpretResult = lox.InterpretResult;
 const Scanner = lox.Scanner;
+const Token = lox.Token;
 
-pub fn compile(src: []const u8) !void {
-    var scanner: Scanner = .init(src[0..]);
+scanner: Scanner,
+parser: Parser,
+src: []const u8,
 
-    var line: u32 = 0;
+pub fn init(src: []const u8) Compiler {
+    return .{
+        .scanner = .init(src[0..]),
+        .parser = .{
+            .current = undefined,
+            .previous = undefined,
+            .had_error = false,
+            .panic_mode = false,
+        },
+        .src = src[0..],
+    };
+}
+
+pub fn compile(self: *Compiler, chunk: *Chunk) InterpretResult {
+    _ = chunk;
+
+    self.advance();
+    expression();
+    self.expect(.Eof, "Expect end of expression");
+
+    return if (self.parser.had_error)
+        .{ .Compile_Error = self.scanner.scan_error.? }
+    else
+        .{ .Ok = {} };
+}
+
+fn advance(self: *Compiler) void {
+    self.parser.previous = self.parser.current;
+
+    // TODO: turn this into a state machine
     while (true) {
-        const token = scanner.getToken() catch |err| {
-            const err_data = scanner.scan_error.?;
-            std.debug.print(
-                "[SCANNER] exited with error {any} at {f}, and msg: {s}",
-                .{ err, err_data.src, err_data.msg },
-            );
-            return err;
-        };
-        if (token.src_loc.line != line) {
-            std.debug.print("{d:4} ", .{token.src_loc.line});
-            line = token.src_loc.line;
-        } else {
-            std.debug.print("   | ", .{});
-        }
-        std.debug.print("{t} '{s}'\n", .{ token.tag, token.lexeme(src) });
+        self.parser.current = self.scanner.getToken();
+        // std.debug.print("{f}\n", .{self.parser.current});
 
-        if (token.tag == .Eof) break;
+        switch (self.parser.current.tag) {
+            .Eof => {
+                std.debug.print(" at end of input\n", .{});
+                break;
+            },
+            .Invalid => {
+                if (self.parser.panic_mode) break;
+                self.parser.panic_mode = true;
+                if (self.scanner.scan_error) |scan_error| {
+                    // BUG: Dummy error Processing for now
+                    std.debug.print("{f} Error {s}\n", .{
+                        scan_error.src,
+                        scan_error.msg,
+                    });
+                }
+                break;
+            },
+            else => std.debug.print(" {s}\n", .{
+                self.parser.current.lexeme(self.src),
+            }),
+        }
     }
 }
+
+fn expression() void {}
+fn expect(self: *Compiler, tag: Token.Tag, msg: []const u8) void {
+    if (self.parser.current.tag == tag) {
+        self.advance();
+        return;
+    }
+
+    std.debug.print("{f} Error {s}\n", .{
+        self.parser.current.src_loc,
+        msg,
+    });
+}
+
+const Parser = struct {
+    current: Token,
+    previous: Token,
+    had_error: bool,
+    panic_mode: bool,
+};
