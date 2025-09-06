@@ -4,8 +4,10 @@ const std = @import("std");
 const lox = @import("lox.zig");
 const Chunk = lox.Chunk;
 const InterpretResult = lox.InterpretResult;
+const OpCode = lox.OpCode;
 const Scanner = lox.Scanner;
 const Token = lox.Token;
+const Value = lox.Value;
 
 scanner: Scanner,
 parser: Parser,
@@ -25,35 +27,66 @@ pub fn init(src: []const u8) Compiler {
 }
 
 pub fn compile(self: *Compiler, chunk: *Chunk) InterpretResult {
-    _ = chunk;
-
     self.advance();
-    expression();
+    self.expression(chunk);
     self.expect(.Eof, "Expect end of expression");
+    self.endCompiler(chunk);
 
-    return if (self.parser.had_error)
-        .{ .Compile_Error = self.scanner.scan_error.? }
-    else
-        .{ .Ok = {} };
+    return if (self.parser.had_error) .{ .Compile_Error = self.scanner.scan_error.? } else .Ok;
+}
+fn parsePrecedence(self: *Compiler, precedence: Parser.Precedence, chunk: *Chunk) void {
+    _ = self;
+    _ = chunk;
+    _ = precedence;
 }
 
 fn emitByte(self: *Compiler, chunk: *Chunk, byte: u8) void {
-    chunk.writeChunk(byte, self.parser.previous.src_loc.line);
+    chunk.writeChunk(byte, @intCast(self.parser.previous.src_loc.line));
 }
 fn emitBytes(self: *Compiler, chunk: *Chunk, byte1: u8, byte2: u8) void {
-    chunk.writeChunk(byte1, self.parser.previous.src_loc.line);
-    chunk.writeChunk(byte2, self.parser.previous.src_loc.line);
+    chunk.writeChunk(byte1, @intCast(self.parser.previous.src_loc.line));
+    chunk.writeChunk(byte2, @intCast(self.parser.previous.src_loc.line));
+}
+fn emitConstant(self: *Compiler, chunk: *Chunk, value: Value) void {
+    const constant = chunk.addConstant(value);
+    self.emitBytes(chunk, @intFromEnum(OpCode.Constant), constant);
 }
 
-fn endCompiler(self: *Compiler) void {
-    self.emitReturn();
+fn emitReturn(self: *Compiler, chunk: *Chunk) void {
+    self.emitByte(chunk, @intFromEnum(OpCode.Return));
+}
+fn endCompiler(self: *Compiler, chunk: *Chunk) void {
+    self.emitReturn(chunk);
 }
 
-fn emitReturn(self: *Compiler) void {
-    self.emitByte(.Return);
+fn expression(self: *Compiler, chunk: *Chunk) void {
+    if (self.parser.current.tag == .Number) {
+        self.parsePrecedence(.Assignment, chunk);
+    }
 }
+fn grouping(self: *Compiler, chunk: *Chunk) void {
+    self.expression(chunk);
+    self.expect(.RightParen, "Expect ')' after expression");
+}
+fn unary(self: *Compiler, chunk: *Chunk) void {
+    const op_type = self.parser.previous.tag;
 
-fn expression() void {}
+    self.parsePrecedence(.Assignment, chunk);
+
+    switch (op_type) {
+        .Minus => {
+            self.emitByte(chunk, @intFromEnum(.Negate));
+        },
+        // missing not when we add bool
+        else => unreachable,
+    }
+    self.expect(.RightParen, "Expect ')' after expression");
+}
+fn number(self: *Compiler, chunk: *Chunk) void {
+    const value = self.parser.previous.literalValue(self.src).number;
+    const constant = chunk.addConstant(value);
+    self.emitBytes(chunk, @intFromEnum(OpCode.Constant), constant);
+}
 
 fn advance(self: *Compiler) void {
     self.parser.previous = self.parser.current;
@@ -103,4 +136,18 @@ const Parser = struct {
     previous: Token,
     had_error: bool,
     panic_mode: bool,
+
+    const Precedence = enum {
+        None,
+        Assignment, // =
+        Or, // or
+        And, // and
+        Equality, // == !=
+        Comparison, // < > <= >=
+        Term, // + -
+        Factor, // * /
+        Unary, // ! -
+        Call, // . ()
+        Primary,
+    };
 };
