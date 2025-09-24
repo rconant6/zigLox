@@ -2,7 +2,7 @@ pub const Token = @This();
 
 const std = @import("std");
 const lox = @import("lox.zig");
-const LiteralValue = lox.LiteralValue;
+const LiteralValue = lox.ValueType;
 const Loc = lox.Location;
 const SrcLoc = lox.SourceLocation;
 
@@ -33,9 +33,8 @@ pub fn literalValue(self: Token, code: []const u8) LiteralValue {
 }
 
 pub fn error_format(self: Token, w: *std.Io.Writer) !void {
-    try w.print("at: {f}   type: {t:13}", .{
+    try w.print(" at: {f}", .{
         self.src_loc,
-        self.tag,
     });
 }
 

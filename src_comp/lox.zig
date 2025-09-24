@@ -1,7 +1,11 @@
 const std = @import("std");
+const err = @import("loxError.zig");
 
 pub const Chunk = @import("Chunk.zig");
 pub const Compiler = @import("Compiler.zig");
+pub const DiagnosticReporter = @import("DiagnosticReporter.zig");
+pub const ErrorContext = err.ErrorContext;
+pub const LoxError = err.LoxError;
 pub const Scanner = @import("Scanner.zig");
 pub const Token = @import("Token.zig");
 pub const VirtualMachine = @import("VirtualMachine.zig");
@@ -41,18 +45,13 @@ pub const Location = struct {
     }
 };
 
-pub const ErrorData = struct {
-    src: SourceLocation,
-    msg: []const u8,
+pub const InterpretResult = enum {
+    Ok,
+    Compile_Error,
+    Runtime_Error,
 };
 
-pub const InterpretResult = union(enum) {
-    Ok: void,
-    Compile_Error: ErrorData,
-    Runtime_Error: ErrorData,
-};
-
-pub const LiteralValue = union(enum) {
+pub const ValueType = union(enum) {
     string: []const u8,
     number: f64,
     bool: bool,
@@ -67,6 +66,9 @@ pub const OpCode = enum(u8) {
     Negate,
     Return,
     Subtract,
+    Nil,
+    True,
+    False,
 
     pub const SIMPLE_LEN = 1;
     pub const CONSTANT_LEN = 2;

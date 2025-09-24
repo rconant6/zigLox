@@ -2,11 +2,10 @@ pub const Scanner = @This();
 
 const std = @import("std");
 const lox = @import("lox.zig");
-const ErrorData = lox.ErrorData;
+const DiagnosticReporter = lox.DiagnosticReporter;
+const ErrorContext = lox.ErrorContext;
+const LoxError = lox.LoxError;
 const Token = lox.Token;
-
-const string_error_msg = "Unclosed string, missing '\"'";
-const unrecognized_character = "Unrecognized character";
 
 const single_char_tokens = std.StaticStringMap(Token.Tag).initComptime(.{
     .{ "(", .LeftParen },   .{ ")", .RightParen },
@@ -37,14 +36,17 @@ idx: u32,
 line: u32,
 col: u32,
 src: []const u8,
-scan_error: ?ErrorData = null,
+err_handler: *DiagnosticReporter,
 
-pub fn init(code: []const u8) Scanner {
+pub fn init(code: []const u8, diagnostic_reporter: *DiagnosticReporter) Scanner {
+    diagnostic_reporter.clearErrors();
+
     return .{
         .idx = 0,
         .line = 1,
         .col = 1,
         .src = code[0..],
+        .err_handler = diagnostic_reporter,
     };
 }
 
@@ -181,13 +183,17 @@ pub fn getToken(
             },
             // Invalid character
             else => {
+                tok.tag = .Invalid;
                 self.startToken(&tok);
                 self.endToken(&tok);
-                self.scan_error = .{
-                    .src = tok.src_loc,
-                    .msg = Scanner.unrecognized_character,
-                };
-                continue :state .end;
+                self.err_handler.reportError(.{
+                    .error_type = LoxError.UnRecognizedCharacter,
+                    .token = tok,
+                    .message = "[SCANNER] unrecognized character found",
+                    .src_code = self.src[self.idx .. self.idx + 1],
+                });
+                self.advance();
+                continue :state .start;
             },
         },
         .comment => comment: switch (self.char()) {
@@ -209,14 +215,19 @@ pub fn getToken(
         },
         .string => string: switch (self.char()) {
             0 => {
-                self.endToken(&tok);
+                // error case need to find end quote
                 tok.tag = .Invalid;
+                self.endToken(&tok); // kill the string so far
+                // log the error
+                self.err_handler.reportError(.{
+                    .error_type = LoxError.UnterminatedString,
+                    .token = tok,
+                    .message = "[SCANNER] cannot terminate string with EOF",
+                    .src_code = self.src[tok.loc.start..tok.loc.end],
+                });
                 self.startToken(&tok);
                 self.endToken(&tok);
-                self.scan_error = .{
-                    .msg = Scanner.string_error_msg,
-                    .src = tok.src_loc,
-                };
+                tok.tag = .Eof;
                 continue :state .end;
             },
             '"' => {

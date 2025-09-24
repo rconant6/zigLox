@@ -28,7 +28,7 @@ pub fn main() !u8 {
             };
         },
         else => {
-            std.debug.print("Usage: zlox [script]\n", .{});
+            std.debug.print("Usage: zlox [script.lox]\n", .{});
             return 64;
         },
     }
