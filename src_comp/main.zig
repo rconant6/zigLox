@@ -2,8 +2,6 @@ const std = @import("std");
 const stdin = lox.in_reader;
 const lox = @import("lox.zig");
 const InterpretResult = lox.InterpretResult;
-const OpCode = lox.OpCode;
-const Value = lox.Value;
 const VirtualMachine = lox.VirtualMachine;
 
 pub fn main() !u8 {
