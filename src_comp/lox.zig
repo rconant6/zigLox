@@ -2,7 +2,7 @@ const std = @import("std");
 const err = @import("loxError.zig");
 
 pub const Chunk = @import("Chunk.zig");
-pub const Compiler = @import("Compiler.zig");
+pub const Compiler = @import("Comp.zig");
 pub const DiagnosticReporter = @import("DiagnosticReporter.zig");
 pub const ErrorContext = err.ErrorContext;
 pub const LoxError = err.LoxError;

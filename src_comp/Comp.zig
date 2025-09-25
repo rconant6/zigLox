@@ -5,46 +5,79 @@ const lox = @import("lox.zig");
 const Chunk = lox.Chunk;
 const DiagnosticReporter = lox.DiagnosticReporter;
 const InterpretResult = lox.InterpretResult;
+const LoxError = lox.LoxError;
 const OpCode = lox.OpCode;
 const Scanner = lox.Scanner;
 const Token = lox.Token;
 const Value = lox.Value;
+
+const Tracer = lox.trace_utils;
+const trace = Tracer.trace;
 
 scanner: Scanner,
 parser: Parser,
 diagnostics: *DiagnosticReporter,
 src: []const u8,
 
-pub fn init(src: []const u8, diagnostic_reporter: *DiagnosticReporter) Compiler {
-    return .{
-        .scanner = .init(src[0..], diagnostic_reporter),
-        .parser = .{
-            .current = undefined,
-            .previous = undefined,
-            .had_error = false,
-            .panic_mode = false,
-        },
-        .diagnostics = diagnostic_reporter,
-        .src = src[0..],
-    };
-}
+const Parser = struct {
+    current: Token,
+    previous: Token,
+    had_error: bool,
+    panic_mode: bool,
+};
 
+const ParseState = enum {
+    start,
+    primary,
+    unimplemented,
+    done,
+};
+
+/// parser.previous is your current token to be processed
+/// parser.current is what you used to decide on the next state to move to
+/// advance is called to then move current into previous
+/// and set up the decision tree again once the new token is set
 pub fn compile(self: *Compiler, chunk: *Chunk) InterpretResult {
+    self.parser.current = self.scanner.getToken();
     self.advance();
-    self.parseExpression(chunk);
-    self.expect(.Eof, "Expect end of expression");
-    self.endCompiler(chunk);
 
-    if (self.diagnostics.hasErrors()) {
-        self.diagnostics.printDiagnostics(lox.out_writer) catch {
-            std.debug.print(
-                "Had trouble printing diagnostics...OOPS\n",
-                .{},
-            );
-        };
-        self.diagnostics.clearErrors();
-        return .Compile_Error;
-    } else return .Ok;
+    parse: switch (ParseState.start) {
+        .start => {
+            Tracer.traceCompile("[PARSER] .start\n", .{});
+            switch (self.parser.previous.tag) {
+                .Number, .True, .False, .Nil => continue :parse .primary,
+                .Eof => continue :parse .done,
+                else => continue :parse .unimplemented,
+            }
+        },
+        .primary => {
+            Tracer.traceCompile("[PARSER] .primary\n", .{});
+            const value = self.parser.previous.literalValue(self.src).number;
+            self.emitConstant(chunk, value);
+
+            switch (self.parser.current.tag) {
+                .Eof => continue :parse .done,
+                else => continue :parse .done,
+            }
+            continue :parse .start;
+        },
+        .done => {
+            Tracer.traceCompile("[PARSER] .done\n", .{});
+            self.emitReturn(chunk);
+            break :parse;
+        },
+        .unimplemented => {
+            Tracer.traceCompile("[PARSER] .unimplemented\n", .{});
+            self.diagnostics.reportError(.{
+                .message = "[PARSER] unimplemented op",
+                .token = self.parser.previous,
+                .error_type = LoxError.Unimplemented,
+                .src_code = self.src[self.parser.previous.loc.start..self.parser.current.loc.end],
+            });
+            return .Compile_Error;
+        },
+    }
+    return .Ok;
 }
 
 fn emitByte(self: *Compiler, chunk: *Chunk, byte: u8) void {
@@ -104,86 +137,16 @@ fn expect(self: *Compiler, tag: Token.Tag, msg: []const u8) void {
     });
 }
 
-const Parser = struct {
-    current: Token,
-    previous: Token,
-    had_error: bool,
-    panic_mode: bool,
-};
-
-const ParsePrecedence = enum {
-    none,
-};
-
-const ParseState = enum {
-    expression,
-    term,
-    factor,
-    unary,
-    primary,
-};
-
-fn parseExpression(self: *Compiler, chunk: *Chunk) void {
-    parse: switch (self.parser.current.tag) {
-        .Number => {
-            const value = self.parser.previous.literalValue(self.src).number;
-            const constant = chunk.addConstant(value);
-            self.emitBytes(chunk, @intFromEnum(OpCode.Constant), constant);
-            self.advance();
-            continue :parse self.parser.current.tag;
+pub fn init(src: []const u8, diagnostic_reporter: *DiagnosticReporter) Compiler {
+    return .{
+        .scanner = .init(src[0..], diagnostic_reporter),
+        .parser = .{
+            .current = undefined,
+            .previous = undefined,
+            .had_error = false,
+            .panic_mode = false,
         },
-        .LeftParen => {
-            self.advance();
-            self.parseExpression(chunk);
-            self.expect(.RightParen, "Expect ')' after expression");
-            self.advance();
-            continue :parse self.parser.current.tag;
-        },
-        .Nil => {
-            self.advance();
-            self.emitByte(chunk, @intFromEnum(OpCode.Nil));
-            continue :parse self.parser.current.tag;
-        },
-        .False => {
-            self.advance();
-            self.emitByte(chunk, @intFromEnum(OpCode.False));
-            continue :parse self.parser.current.tag;
-        },
-        .True => {
-            self.advance();
-            self.emitByte(chunk, @intFromEnum(OpCode.True));
-            continue :parse self.parser.current.tag;
-        },
-        .Minus => {
-            self.advance();
-            self.parseExpression(chunk);
-            self.emitByte(chunk, @intFromEnum(OpCode.Negate));
-            self.advance();
-            continue :parse self.parser.current.tag;
-        },
-        .Plus, .Star, .Slash => {
-            const op = self.parser.current.tag;
-            self.advance();
-            self.parseExpression(chunk);
-            switch (op) {
-                .Plus => self.emitByte(chunk, @intFromEnum(OpCode.Add)),
-                .Star => self.emitByte(chunk, @intFromEnum(OpCode.Multiply)),
-                .Slash => self.emitByte(chunk, @intFromEnum(OpCode.Divide)),
-                else => unreachable,
-            }
-            self.advance();
-            continue :parse self.parser.current.tag;
-        },
-        .Eof => return,
-        .Invalid => return,
-        else => {
-            std.debug.print("[PARSER]: Unexpected or invalid token found", .{});
-            return;
-        },
-    }
+        .diagnostics = diagnostic_reporter,
+        .src = src[0..],
+    };
 }
-
-// fn errorAt(self: *Compiler, msg: []const u8) void {
-//     self.parser.panic_mode = true;
-//     std.debug.print("Compiler Error {s}", .{msg});
-// }

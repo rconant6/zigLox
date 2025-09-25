@@ -24,46 +24,54 @@ pub fn interpret(self: *VirtualMachine, src: []const u8) InterpretResult {
     var compiler: Compiler = .init(src[0..], &self.diagnostics);
     // const compiler_result = compiler.compile(&chunk);
     _ = compiler.compile(&chunk);
-    if (self.diagnostics.hasErrors()) return .Compile_Error;
+    if (self.diagnostics.hasErrors()) {
+        std.log.debug("Compiler returned and error", .{});
+        for (self.diagnostics.errors.items) |item| {
+            std.log.debug("{f}", .{item});
+        }
+        return .Compile_Error;
+    }
+
+    chunk.disassembleChunk("Interpret");
 
     vm: switch (readOp(chunk.code.items, &ip)) {
-        .Add => {
-            trace("Binary OP: {s}\n", .{"+"});
-            self.binaryOp(struct {
-                fn add(a: f64, b: f64) f64 {
-                    return a + b;
-                }
-            }.add);
+        // .Add => {
+        //     trace("Binary OP: {s}\n", .{"+"});
+        //     self.binaryOp(struct {
+        //         fn add(a: f64, b: f64) f64 {
+        //             return a + b;
+        //         }
+        //     }.add);
 
-            continue :vm readOp(chunk.code.items, &ip);
-        },
-        .Subtract => {
-            trace("Binary OP: {s}\n", .{"-"});
-            self.binaryOp(struct {
-                fn sub(a: f64, b: f64) f64 {
-                    return a - b;
-                }
-            }.sub);
-            continue :vm readOp(chunk.code.items, &ip);
-        },
-        .Multiply => {
-            trace("Binary OP: {s}\n", .{"*"});
-            self.binaryOp(struct {
-                fn mul(a: f64, b: f64) f64 {
-                    return a * b;
-                }
-            }.mul);
-            continue :vm readOp(chunk.code.items, &ip);
-        },
-        .Divide => {
-            trace("Binary OP: {s}\n", .{"/"});
-            self.binaryOp(struct {
-                fn div(a: f64, b: f64) f64 {
-                    return a / b;
-                }
-            }.div);
-            continue :vm readOp(chunk.code.items, &ip);
-        },
+        //     continue :vm readOp(chunk.code.items, &ip);
+        // },
+        // .Subtract => {
+        //     trace("Binary OP: {s}\n", .{"-"});
+        //     self.binaryOp(struct {
+        //         fn sub(a: f64, b: f64) f64 {
+        //             return a - b;
+        //         }
+        //     }.sub);
+        //     continue :vm readOp(chunk.code.items, &ip);
+        // },
+        // .Multiply => {
+        //     trace("Binary OP: {s}\n", .{"*"});
+        //     self.binaryOp(struct {
+        //         fn mul(a: f64, b: f64) f64 {
+        //             return a * b;
+        //         }
+        //     }.mul);
+        //     continue :vm readOp(chunk.code.items, &ip);
+        // },
+        // .Divide => {
+        //     trace("Binary OP: {s}\n", .{"/"});
+        //     self.binaryOp(struct {
+        //         fn div(a: f64, b: f64) f64 {
+        //             return a / b;
+        //         }
+        //     }.div);
+        //     continue :vm readOp(chunk.code.items, &ip);
+        // },
         .Constant => {
             const constant = readConstant(chunk.code.items, &ip, &chunk);
             trace("Constant OP: {d}\n", .{constant});
@@ -75,11 +83,13 @@ pub fn interpret(self: *VirtualMachine, src: []const u8) InterpretResult {
             continue :vm readOp(chunk.code.items, &ip);
         },
         .Return => {
-            std.debug.assert(self.stack.items.len == 0);
             trace("RETURN .Ok\n", .{});
             return .Ok;
         },
-        .False, .True, .Nil => {},
+        .Add, .Multiply, .Subtract, .Divide, .False, .True, .Nil => {
+            std.debug.print("Unimplemented opcode\n", .{});
+            return .Runtime_Error;
+        },
     }
     return .Ok;
 }
