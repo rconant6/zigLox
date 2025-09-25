@@ -43,7 +43,7 @@ pub fn compile(self: *Compiler, chunk: *Chunk) InterpretResult {
 
     parse: switch (ParseState.start) {
         .start => {
-            Tracer.traceCompile("[PARSER] .start\n", .{});
+            Tracer.traceCompile("[PARSER] .start {t}\n", .{self.parser.previous.tag});
             switch (self.parser.previous.tag) {
                 .Number, .True, .False, .Nil => continue :parse .primary,
                 .Eof => continue :parse .done,
@@ -52,14 +52,39 @@ pub fn compile(self: *Compiler, chunk: *Chunk) InterpretResult {
         },
         .primary => {
             Tracer.traceCompile("[PARSER] .primary\n", .{});
-            const value = self.parser.previous.literalValue(self.src).number;
-            self.emitConstant(chunk, value);
+            switch (self.parser.previous.tag) {
+                .Number => {
+                    Tracer.traceCompile("[PARSER] .number\n", .{});
+                    const value = self.parser.previous.literalValue(self.src).number;
+                    self.emitConstant(chunk, value);
+                },
+                .True => {
+                    Tracer.traceCompile("[PARSER] .true\n", .{});
+                    self.emitByte(chunk, @intFromEnum(OpCode.True));
+                },
+                .False => {
+                    Tracer.traceCompile("[PARSER] .false\n", .{});
+                    self.emitByte(chunk, @intFromEnum(OpCode.False));
+                },
+                .Nil => {
+                    Tracer.traceCompile("[PARSER] .nil\n", .{});
+                    self.emitByte(chunk, @intFromEnum(OpCode.Nil));
+                },
+                .Eof => continue :parse .done,
+                else => unreachable,
+            }
 
+            // fall through to decide next action since not forced by the above
+            Tracer.traceCompile("[PARSER] .primary_fall {t}\n", .{
+                self.parser.current.tag,
+            });
             switch (self.parser.current.tag) {
                 .Eof => continue :parse .done,
-                else => continue :parse .done,
+                else => {
+                    self.advance();
+                    continue :parse .start;
+                },
             }
-            continue :parse .start;
         },
         .done => {
             Tracer.traceCompile("[PARSER] .done\n", .{});
@@ -102,7 +127,6 @@ fn endCompiler(self: *Compiler, chunk: *Chunk) void {
 fn advance(self: *Compiler) void {
     self.parser.previous = self.parser.current;
 
-    // TODO: turn this into a state machine
     while (true) {
         self.parser.current = self.scanner.getToken();
 
@@ -113,15 +137,9 @@ fn advance(self: *Compiler) void {
             .Invalid => {
                 if (self.parser.panic_mode) break;
                 self.parser.panic_mode = true;
-                if (self.diagnostics.hasErrors()) {
-                    // std.debug.print("ERROR FOUND: {f}", .{self.diagnostics.errors.items[0]});
-                    std.debug.print("ERROR FOUND: \n", .{});
-                }
                 break;
             },
-            else => std.debug.print(" {s}\n", .{
-                self.parser.current.lexeme(self.src),
-            }),
+            else => return,
         }
     }
 }

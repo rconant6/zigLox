@@ -22,7 +22,6 @@ pub fn interpret(self: *VirtualMachine, src: []const u8) InterpretResult {
     defer chunk.deinit();
 
     var compiler: Compiler = .init(src[0..], &self.diagnostics);
-    // const compiler_result = compiler.compile(&chunk);
     _ = compiler.compile(&chunk);
     if (self.diagnostics.hasErrors()) {
         std.log.debug("Compiler returned and error", .{});
@@ -35,43 +34,43 @@ pub fn interpret(self: *VirtualMachine, src: []const u8) InterpretResult {
     chunk.disassembleChunk("Interpret");
 
     vm: switch (readOp(chunk.code.items, &ip)) {
-        // .Add => {
-        //     trace("Binary OP: {s}\n", .{"+"});
-        //     self.binaryOp(struct {
-        //         fn add(a: f64, b: f64) f64 {
-        //             return a + b;
-        //         }
-        //     }.add);
+        .Add => {
+            trace("Binary OP: {s}\n", .{"+"});
+            self.binaryOp(struct {
+                fn add(a: f64, b: f64) f64 {
+                    return a + b;
+                }
+            }.add);
 
-        //     continue :vm readOp(chunk.code.items, &ip);
-        // },
-        // .Subtract => {
-        //     trace("Binary OP: {s}\n", .{"-"});
-        //     self.binaryOp(struct {
-        //         fn sub(a: f64, b: f64) f64 {
-        //             return a - b;
-        //         }
-        //     }.sub);
-        //     continue :vm readOp(chunk.code.items, &ip);
-        // },
-        // .Multiply => {
-        //     trace("Binary OP: {s}\n", .{"*"});
-        //     self.binaryOp(struct {
-        //         fn mul(a: f64, b: f64) f64 {
-        //             return a * b;
-        //         }
-        //     }.mul);
-        //     continue :vm readOp(chunk.code.items, &ip);
-        // },
-        // .Divide => {
-        //     trace("Binary OP: {s}\n", .{"/"});
-        //     self.binaryOp(struct {
-        //         fn div(a: f64, b: f64) f64 {
-        //             return a / b;
-        //         }
-        //     }.div);
-        //     continue :vm readOp(chunk.code.items, &ip);
-        // },
+            continue :vm readOp(chunk.code.items, &ip);
+        },
+        .Subtract => {
+            trace("Binary OP: {s}\n", .{"-"});
+            self.binaryOp(struct {
+                fn sub(a: f64, b: f64) f64 {
+                    return a - b;
+                }
+            }.sub);
+            continue :vm readOp(chunk.code.items, &ip);
+        },
+        .Multiply => {
+            trace("Binary OP: {s}\n", .{"*"});
+            self.binaryOp(struct {
+                fn mul(a: f64, b: f64) f64 {
+                    return a * b;
+                }
+            }.mul);
+            continue :vm readOp(chunk.code.items, &ip);
+        },
+        .Divide => {
+            trace("Binary OP: {s}\n", .{"/"});
+            self.binaryOp(struct {
+                fn div(a: f64, b: f64) f64 {
+                    return a / b;
+                }
+            }.div);
+            continue :vm readOp(chunk.code.items, &ip);
+        },
         .Constant => {
             const constant = readConstant(chunk.code.items, &ip, &chunk);
             trace("Constant OP: {d}\n", .{constant});
@@ -79,6 +78,7 @@ pub fn interpret(self: *VirtualMachine, src: []const u8) InterpretResult {
             continue :vm readOp(chunk.code.items, &ip);
         },
         .Negate => {
+            trace("Negate OP:\n", .{});
             self.push(-self.pop());
             continue :vm readOp(chunk.code.items, &ip);
         },
@@ -86,9 +86,17 @@ pub fn interpret(self: *VirtualMachine, src: []const u8) InterpretResult {
             trace("RETURN .Ok\n", .{});
             return .Ok;
         },
-        .Add, .Multiply, .Subtract, .Divide, .False, .True, .Nil => {
-            std.debug.print("Unimplemented opcode\n", .{});
-            return .Runtime_Error;
+        .True => {
+            trace("True:\n", .{});
+            self.push(@intFromBool(true));
+        },
+        .False => {
+            trace("False:\n", .{});
+            self.push(@intFromBool(false));
+        },
+        .Nil => {
+            trace("True:\n", .{});
+            self.push(std.math.nan(f64));
         },
     }
     return .Ok;
