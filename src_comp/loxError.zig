@@ -20,6 +20,7 @@ pub const LoxError = error{
     ExpectedSemiColon,
     ExpectedToken,
     TooManyArguments,
+    UnmatchedClosingParen,
     UnexpectedToken,
     // Semantic Errors
     BrokenSuperLink,

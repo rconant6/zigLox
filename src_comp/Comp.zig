@@ -41,6 +41,7 @@ const ParsingState = enum {
 };
 
 const OpPrecedence = enum(u8) {
+    group_start,
     unary,
     factor,
     term,
@@ -49,12 +50,29 @@ const OpPrecedence = enum(u8) {
     logic_and,
     logic_or,
     assignment,
+
+    inline fn lower(a: OpPrecedence, b: OpPrecedence) bool {
+        return if (@intFromEnum(a) < @intFromEnum(b)) true else false;
+    }
 };
 const OpStorage = struct {
     precedence: OpPrecedence,
     code: OpCode,
 };
-
+fn consumeStack(
+    self: *Compiler,
+    stack: *std.ArrayList(OpStorage),
+    precedence: OpPrecedence,
+    chunk: *Chunk,
+) void {
+    while (stack.items.len > 0) {
+        Tracer.traceCompile("[PARSER] .popping op\n", .{});
+        const op = stack.pop() orelse unreachable;
+        if (OpPrecedence.lower(op.code, precedence)) {
+            self.emitByte(chunk, @intFromEnum(op.code));
+        }
+    }
+}
 /// parser.previous is your current token to be processed
 /// parser.current is what you used to decide on the next state to move to
 /// advance is called to then move current into previous
@@ -64,6 +82,9 @@ pub fn compile(self: *Compiler, chunk: *Chunk) InterpretResult {
     self.advance();
 
     var parse_state: ParsingState = .expecting_value;
+
+    var open_paren_cnt: u16 = 0; // max of 65k+
+
     var op_stack: std.ArrayList(OpStorage) = .empty;
     defer op_stack.deinit(self.gpa);
 
@@ -75,6 +96,36 @@ pub fn compile(self: *Compiler, chunk: *Chunk) InterpretResult {
                 .Bang => continue :parse .unary,
                 .Minus => continue :parse .unary,
                 .Eof => continue :parse .done,
+                .LeftParen => {
+                    open_paren_cnt += 1;
+                    self.advance();
+                    continue :parse .start;
+                },
+                .RightParen => {
+                    Tracer.traceCompile(
+                        "[PARSER] .right_paren  count: {d}  \n",
+                        .{open_paren_cnt},
+                    );
+                    if (open_paren_cnt <= 0) {
+                        self.diagnostics.reportError(.{
+                            .error_type = LoxError.UnmatchedClosingParen,
+                            .message = "')' requires an opening paren ')'",
+                            .src_code = self.src[self.parser.previous.loc.start..self.parser.previous.loc.end],
+                            .token = self.parser.previous,
+                        });
+                        break :parse;
+                    }
+
+                    open_paren_cnt -= 1;
+
+                    while (op_stack.items.len > 0) {
+                        Tracer.traceCompile("[PARSER] .popping op\n", .{});
+                        const op = op_stack.pop() orelse unreachable; // can't get here w/out check above?
+                        if (op.precedence == .group_start) break;
+                    }
+                    self.advance();
+                    continue :parse .start;
+                },
                 else => continue :parse .unimplemented,
             }
         },
@@ -107,7 +158,7 @@ pub fn compile(self: *Compiler, chunk: *Chunk) InterpretResult {
 
             while (op_stack.items.len > 0) {
                 Tracer.traceCompile("[PARSER] .popping op\n", .{});
-                const op = op_stack.pop() orelse break;
+                const op = op_stack.pop() orelse unreachable;
                 if (op.precedence == .unary) {
                     self.emitByte(chunk, @intFromEnum(op.code));
                 }
