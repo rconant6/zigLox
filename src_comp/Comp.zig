@@ -18,6 +18,7 @@ scanner: Scanner,
 parser: Parser,
 diagnostics: *DiagnosticReporter,
 src: []const u8,
+gpa: std.mem.Allocator,
 
 const Parser = struct {
     current: Token,
@@ -29,8 +30,29 @@ const Parser = struct {
 const ParseState = enum {
     start,
     primary,
+    unary,
     unimplemented,
     done,
+};
+
+const ParsingState = enum {
+    expecting_value,
+    got_value,
+};
+
+const OpPrecedence = enum(u8) {
+    unary,
+    factor,
+    term,
+    comparision,
+    equality,
+    logic_and,
+    logic_or,
+    assignment,
+};
+const OpStorage = struct {
+    precedence: OpPrecedence,
+    code: OpCode,
 };
 
 /// parser.previous is your current token to be processed
@@ -41,11 +63,17 @@ pub fn compile(self: *Compiler, chunk: *Chunk) InterpretResult {
     self.parser.current = self.scanner.getToken();
     self.advance();
 
+    var parse_state: ParsingState = .expecting_value;
+    var op_stack: std.ArrayList(OpStorage) = .empty;
+    defer op_stack.deinit(self.gpa);
+
     parse: switch (ParseState.start) {
         .start => {
             Tracer.traceCompile("[PARSER] .start {t}\n", .{self.parser.previous.tag});
             switch (self.parser.previous.tag) {
                 .Number, .True, .False, .Nil => continue :parse .primary,
+                .Bang => continue :parse .unary,
+                .Minus => continue :parse .unary,
                 .Eof => continue :parse .done,
                 else => continue :parse .unimplemented,
             }
@@ -71,7 +99,18 @@ pub fn compile(self: *Compiler, chunk: *Chunk) InterpretResult {
                     self.emitByte(chunk, @intFromEnum(OpCode.Nil));
                 },
                 .Eof => continue :parse .done,
-                else => unreachable,
+                else => unreachable, // NOTE: unimplemented or an error?
+            }
+
+            // manage what parser is looking for
+            parse_state = .got_value;
+
+            while (op_stack.items.len > 0) {
+                Tracer.traceCompile("[PARSER] .popping op\n", .{});
+                const op = op_stack.pop() orelse break;
+                if (op.precedence == .unary) {
+                    self.emitByte(chunk, @intFromEnum(op.code));
+                }
             }
 
             // fall through to decide next action since not forced by the above
@@ -85,6 +124,30 @@ pub fn compile(self: *Compiler, chunk: *Chunk) InterpretResult {
                     continue :parse .start;
                 },
             }
+        },
+        .unary => {
+            Tracer.traceCompile("[PARSER] .unary {t}\n", .{
+                self.parser.current.tag, // operand start
+            });
+
+            // push the operation
+            const op = self.parser.previous.tag;
+            switch (op) {
+                .Minus => op_stack.append(self.gpa, .{
+                    .precedence = .unary,
+                    .code = .Negate,
+                }) catch unreachable,
+                .Bang => op_stack.append(self.gpa, .{
+                    .precedence = .unary,
+                    .code = .Not,
+                }) catch unreachable,
+                else => unreachable,
+            }
+
+            // go and get the operand
+            parse_state = .expecting_value;
+            self.advance();
+            continue :parse .start;
         },
         .done => {
             Tracer.traceCompile("[PARSER] .done\n", .{});
@@ -155,8 +218,13 @@ fn expect(self: *Compiler, tag: Token.Tag, msg: []const u8) void {
     });
 }
 
-pub fn init(src: []const u8, diagnostic_reporter: *DiagnosticReporter) Compiler {
+pub fn init(
+    gpa: std.mem.Allocator,
+    src: []const u8,
+    diagnostic_reporter: *DiagnosticReporter,
+) Compiler {
     return .{
+        .gpa = gpa,
         .scanner = .init(src[0..], diagnostic_reporter),
         .parser = .{
             .current = undefined,

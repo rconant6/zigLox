@@ -49,6 +49,7 @@ fn disassembleInstruction(self: *const Chunk, offset: usize) usize {
         .Add, .Divide, .Multiply, .Subtract => self.simpleInstruction(instruction, offset),
         .True => self.simpleInstruction(instruction, offset),
         .False => self.simpleInstruction(instruction, offset),
+        .Not => self.simpleInstruction(instruction, offset),
         .Nil => self.simpleInstruction(instruction, offset),
     };
 }

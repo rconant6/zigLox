@@ -21,7 +21,7 @@ pub fn interpret(self: *VirtualMachine, src: []const u8) InterpretResult {
     var chunk: Chunk = .init(self.gpa);
     defer chunk.deinit();
 
-    var compiler: Compiler = .init(src[0..], &self.diagnostics);
+    var compiler: Compiler = .init(self.gpa, src[0..], &self.diagnostics);
     _ = compiler.compile(&chunk);
     if (self.diagnostics.hasErrors()) {
         std.log.debug("Compiler returned and error", .{});
@@ -41,6 +41,7 @@ pub fn interpret(self: *VirtualMachine, src: []const u8) InterpretResult {
                     return a + b;
                 }
             }.add);
+            // TODO: String needs to be handled here
 
             continue :vm readOp(chunk.code.items, &ip);
         },
@@ -73,13 +74,20 @@ pub fn interpret(self: *VirtualMachine, src: []const u8) InterpretResult {
         },
         .Constant => {
             const constant = readConstant(chunk.code.items, &ip, &chunk);
-            trace("Constant OP: {d}\n", .{constant});
+            trace("Constant OP: {any}\n", .{constant});
             self.push(constant);
             continue :vm readOp(chunk.code.items, &ip);
         },
         .Negate => {
             trace("Negate OP:\n", .{});
             self.push(-self.pop());
+            continue :vm readOp(chunk.code.items, &ip);
+        },
+        .Not => {
+            trace("Not OP:\n", .{});
+            const val = self.pop();
+            const rep_val: f64 = if (val == 0.0 or std.math.isNan(val)) 1.0 else 0.0;
+            self.push(rep_val);
             continue :vm readOp(chunk.code.items, &ip);
         },
         .Return => {
@@ -95,7 +103,7 @@ pub fn interpret(self: *VirtualMachine, src: []const u8) InterpretResult {
             self.push(@intFromBool(false));
         },
         .Nil => {
-            trace("True:\n", .{});
+            trace("Nil:\n", .{});
             self.push(std.math.nan(f64));
         },
     }
@@ -111,7 +119,7 @@ inline fn readOp(bytecode: []u8, ip: *usize) OpCode {
     ip.* += 1;
     return result;
 }
-fn binaryOp(self: *VirtualMachine, comptime op: fn (f64, f64) f64) void {
+fn binaryOp(self: *VirtualMachine, comptime op: fn (Value, Value) f64) void {
     const b = self.pop();
     const a = self.pop();
     self.push(op(a, b));
@@ -130,13 +138,14 @@ pub fn deinit(vm: *VirtualMachine) void {
     return;
 }
 
-fn push(vm: *VirtualMachine, val: Value) void {
+fn push(vm: *VirtualMachine, val: f64) void {
     Tracer.traceStack("VM.Push: {d}\n", .{val});
     vm.stack.append(vm.gpa, val) catch |err| {
         std.log.err("Unable to VM.push: {any}\n", .{err});
+        unreachable;
     };
 }
-fn pop(vm: *VirtualMachine) Value {
+fn pop(vm: *VirtualMachine) f64 {
     Tracer.traceStack("VM.Pop \n", .{});
     return if (vm.stack.pop()) |v| v else {
         std.log.err("VM.pop on an empty stack\n", .{});

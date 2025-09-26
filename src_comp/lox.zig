@@ -64,6 +64,7 @@ pub const OpCode = enum(u8) {
     Divide,
     Multiply,
     Negate,
+    Not,
     Return,
     Subtract,
     Nil,
