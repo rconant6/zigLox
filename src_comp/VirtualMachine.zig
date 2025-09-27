@@ -97,14 +97,67 @@ pub fn interpret(self: *VirtualMachine, src: []const u8) InterpretResult {
         .True => {
             trace("True:\n", .{});
             self.push(@intFromBool(true));
+            continue :vm readOp(chunk.code.items, &ip);
         },
         .False => {
             trace("False:\n", .{});
             self.push(@intFromBool(false));
+            continue :vm readOp(chunk.code.items, &ip);
         },
         .Nil => {
             trace("Nil:\n", .{});
             self.push(std.math.nan(f64));
+            continue :vm readOp(chunk.code.items, &ip);
+        },
+        .Equal => {
+            trace("Equal OP:\n", .{});
+            const b = self.pop();
+            const a = self.pop();
+            self.push(if (a == b) 1.0 else 0.0);
+            continue :vm readOp(chunk.code.items, &ip);
+        },
+        .NotEqual => {
+            trace("NotEqual OP:\n", .{});
+            const b = self.pop();
+            const a = self.pop();
+            self.push(if (a != b) 1.0 else 0.0);
+            continue :vm readOp(chunk.code.items, &ip);
+        },
+        .Greater => {
+            trace("Greater OP:\n", .{});
+            self.binaryOp(struct {
+                fn gt(a: f64, b: f64) f64 {
+                    return if (a > b) 1.0 else 0.0;
+                }
+            }.gt);
+            continue :vm readOp(chunk.code.items, &ip);
+        },
+        .GreaterEqual => {
+            trace("GreaterEqual OP:\n", .{});
+            self.binaryOp(struct {
+                fn ge(a: f64, b: f64) f64 {
+                    return if (a >= b) 1.0 else 0.0;
+                }
+            }.ge);
+            continue :vm readOp(chunk.code.items, &ip);
+        },
+        .Less => {
+            trace("Less OP:\n", .{});
+            self.binaryOp(struct {
+                fn lt(a: f64, b: f64) f64 {
+                    return if (a < b) 1.0 else 0.0;
+                }
+            }.lt);
+            continue :vm readOp(chunk.code.items, &ip);
+        },
+        .LessEqual => {
+            trace("LessEqual OP:\n", .{});
+            self.binaryOp(struct {
+                fn le(a: f64, b: f64) f64 {
+                    return if (a <= b) 1.0 else 0.0;
+                }
+            }.le);
+            continue :vm readOp(chunk.code.items, &ip);
         },
     }
     return .Ok;

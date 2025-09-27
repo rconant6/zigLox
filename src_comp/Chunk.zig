@@ -51,6 +51,7 @@ fn disassembleInstruction(self: *const Chunk, offset: usize) usize {
         .False => self.simpleInstruction(instruction, offset),
         .Not => self.simpleInstruction(instruction, offset),
         .Nil => self.simpleInstruction(instruction, offset),
+        .Equal, .NotEqual, .Greater, .GreaterEqual, .Less, .LessEqual => self.simpleInstruction(instruction, offset),
     };
 }
 fn constantInstruction(self: *const Chunk, op: OpCode, offset: usize) usize {

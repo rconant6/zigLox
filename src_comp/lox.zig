@@ -70,6 +70,12 @@ pub const OpCode = enum(u8) {
     Nil,
     True,
     False,
+    Equal,
+    NotEqual,
+    Greater,
+    GreaterEqual,
+    Less,
+    LessEqual,
 
     pub const SIMPLE_LEN = 1;
     pub const CONSTANT_LEN = 2;
