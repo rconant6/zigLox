@@ -51,8 +51,13 @@ const OpPrecedence = enum(u8) {
     logic_or,
     assignment,
 
-    inline fn lower(a: OpPrecedence, b: OpPrecedence) bool {
-        return if (@intFromEnum(a) < @intFromEnum(b)) true else false;
+    inline fn binds_tighter(a: OpPrecedence, b: OpPrecedence) bool {
+        return if (@intFromEnum(a) > @intFromEnum(b)) true else false;
+    }
+    inline fn nextLowerPrecedence(prec: OpPrecedence) OpPrecedence {
+        const val: OpPrecedence = @enumFromInt(@intFromEnum(prec) + 1);
+        std.log.debug("{t}", .{val});
+        return val;
     }
 };
 const OpStorage = struct {
@@ -65,18 +70,18 @@ fn consumeStack(
     precedence: OpPrecedence,
     chunk: *Chunk,
 ) void {
+    Tracer.traceCompile("[PARSER] consuming stack\n", .{});
     while (stack.items.len > 0) {
-        Tracer.traceCompile("[PARSER] .popping op\n", .{});
         const op = stack.pop() orelse unreachable;
-        if (OpPrecedence.lower(op.code, precedence)) {
+        if (op.precedence.binds_tighter(precedence)) {
             self.emitByte(chunk, @intFromEnum(op.code));
         }
     }
 }
-/// parser.previous is your current token to be processed
-/// parser.current is what you used to decide on the next state to move to
-/// advance is called to then move current into previous
-/// and set up the decision tree again once the new token is set
+// parser.previous is your current token to be processed
+// parser.current is what you used to decide on the next state to move to
+// advance is called to then move current into previous
+// and set up the decision tree again once the new token is set
 pub fn compile(self: *Compiler, chunk: *Chunk) InterpretResult {
     self.parser.current = self.scanner.getToken();
     self.advance();
@@ -118,11 +123,8 @@ pub fn compile(self: *Compiler, chunk: *Chunk) InterpretResult {
 
                     open_paren_cnt -= 1;
 
-                    while (op_stack.items.len > 0) {
-                        Tracer.traceCompile("[PARSER] .popping op\n", .{});
-                        const op = op_stack.pop() orelse unreachable; // can't get here w/out check above?
-                        if (op.precedence == .group_start) break;
-                    }
+                    // close out the grouping
+                    self.consumeStack(&op_stack, OpPrecedence.nextLowerPrecedence(.group_start), chunk);
                     self.advance();
                     continue :parse .start;
                 },
@@ -156,13 +158,8 @@ pub fn compile(self: *Compiler, chunk: *Chunk) InterpretResult {
             // manage what parser is looking for
             parse_state = .got_value;
 
-            while (op_stack.items.len > 0) {
-                Tracer.traceCompile("[PARSER] .popping op\n", .{});
-                const op = op_stack.pop() orelse unreachable;
-                if (op.precedence == .unary) {
-                    self.emitByte(chunk, @intFromEnum(op.code));
-                }
-            }
+            // keep precedence order for ops
+            self.consumeStack(&op_stack, OpPrecedence.nextLowerPrecedence(.unary), chunk);
 
             // fall through to decide next action since not forced by the above
             Tracer.traceCompile("[PARSER] .primary_fall {t}\n", .{
@@ -201,6 +198,14 @@ pub fn compile(self: *Compiler, chunk: *Chunk) InterpretResult {
             continue :parse .start;
         },
         .done => {
+            if (open_paren_cnt > 0) {
+                self.diagnostics.reportError(.{
+                    .error_type = LoxError.Unclosedgrouping,
+                    .message = "')' requires an opening paren ')'",
+                    .src_code = self.src[self.parser.previous.loc.start..self.parser.previous.loc.end],
+                    .token = self.parser.previous,
+                });
+            }
             Tracer.traceCompile("[PARSER] .done\n", .{});
             self.emitReturn(chunk);
             break :parse;

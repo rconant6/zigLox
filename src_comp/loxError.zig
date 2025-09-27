@@ -21,6 +21,7 @@ pub const LoxError = error{
     ExpectedToken,
     TooManyArguments,
     UnmatchedClosingParen,
+    Unclosedgrouping,
     UnexpectedToken,
     // Semantic Errors
     BrokenSuperLink,
