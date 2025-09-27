@@ -1,0 +1,1 @@
+- I'd like you to give me steps in english and not write code for me since this is a learning project
