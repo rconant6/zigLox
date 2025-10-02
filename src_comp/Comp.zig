@@ -65,8 +65,8 @@ const OpStorage = struct {
     code: OpCode,
 };
 
-fn getBinaryOp(token: Token.Tag) ?OpStorage {
-    return switch (token) {
+fn getBinaryOp(token_tag: Token.Tag) ?OpStorage {
+    return switch (token_tag) {
         .Plus => .{ .precedence = .term, .code = .Add },
         .Minus => .{ .precedence = .term, .code = .Subtract },
         .Star => .{ .precedence = .factor, .code = .Multiply },
@@ -88,11 +88,10 @@ fn consumeGroup(
     Tracer.traceCompile("[PARSER] consuming stack grouping\n", .{});
     while (stack.items.len > 0) {
         const op = stack.pop() orelse break;
-        if (op.precedence != .group_start) {
-            self.emitByte(chunk, @intFromEnum(op.code));
-        } else {
+        if (op.precedence == .group_start) {
             break;
         }
+        self.emitByte(chunk, @intFromEnum(op.code));
     }
 }
 
@@ -103,9 +102,12 @@ fn consumeUnary(
 ) void {
     Tracer.traceCompile("[PARSER] consuming unary\n", .{});
     while (stack.items.len > 0) {
-        const op = stack.pop() orelse unreachable;
-        if (op.precedence == .unary) {
+        const top = stack.items[stack.items.len - 1];
+        if (top.precedence == .unary) {
+            const op = stack.pop() orelse break;
             self.emitByte(chunk, @intFromEnum(op.code));
+        } else {
+            break;
         }
     }
 }
@@ -119,8 +121,16 @@ fn consumeBinary(
     Tracer.traceCompile("[PARSER] consuming stack with precedence {t}\n", .{precedence});
     while (stack.items.len > 0) {
         const top = stack.items[stack.items.len - 1];
+
+        // Stop if we hit a group marker - can't pop past it
+        if (top.precedence == .group_start) {
+            break;
+        }
+
         if (top.precedence.binds_tighter(precedence) or
-           (@intFromEnum(top.precedence) == @intFromEnum(precedence) and top.precedence != .group_start)) {
+            (@intFromEnum(top.precedence) == @intFromEnum(precedence) and
+                top.precedence != .group_start))
+        {
             const op = stack.pop() orelse break;
             self.emitByte(chunk, @intFromEnum(op.code));
         } else {
@@ -134,7 +144,10 @@ fn consumeAllOperators(
     stack: *std.ArrayList(OpStorage),
     chunk: *Chunk,
 ) void {
-    Tracer.traceCompile("[PARSER] consuming all remaining operators\n", .{});
+    Tracer.traceCompile(
+        "[PARSER] consuming all remaining operators with len: {d}\n",
+        .{stack.items.len},
+    );
     while (stack.items.len > 0) {
         const op = stack.pop() orelse break;
         if (op.precedence != .group_start) {
@@ -150,16 +163,16 @@ pub fn compile(self: *Compiler, chunk: *Chunk) InterpretResult {
     self.parser.current = self.scanner.getToken();
     self.advance();
 
+    var op_stack: std.ArrayList(OpStorage) = .empty;
+    defer op_stack.deinit(self.gpa);
+
     var parse_state: ParsingState = .expecting_value;
 
     var open_paren_cnt: u16 = 0; // max of 65k+
 
-    var op_stack: std.ArrayList(OpStorage) = .empty;
-    defer op_stack.deinit(self.gpa);
-
     parse: switch (ParseState.start) {
         .start => {
-            Tracer.traceCompile("[PARSER] .start {t} (state: {t})\n", .{self.parser.previous.tag, parse_state});
+            Tracer.traceCompile("[PARSER] .start {t} (state: {t})\n", .{ self.parser.previous.tag, parse_state });
 
             switch (parse_state) {
                 .expecting_value => {
@@ -170,6 +183,11 @@ pub fn compile(self: *Compiler, chunk: *Chunk) InterpretResult {
                         .Minus => continue :parse .unary,
                         .LeftParen => {
                             open_paren_cnt += 1;
+                            op_stack.append(self.gpa, .{
+                                .precedence = .group_start,
+                                .code = .Nil,
+                            }) catch unreachable;
+
                             self.advance();
                             continue :parse .start;
                         },
@@ -182,10 +200,10 @@ pub fn compile(self: *Compiler, chunk: *Chunk) InterpretResult {
                     switch (self.parser.previous.tag) {
                         .Eof => continue :parse .done,
                         .RightParen => {
-                            Tracer.traceCompile(
-                                "[PARSER] .right_paren  count: {d}  \n",
-                                .{open_paren_cnt},
-                            );
+                            // Tracer.traceCompile(
+                            //     "[PARSER] .right_paren  count: {d}  \n",
+                            //     .{open_paren_cnt},
+                            // );
                             if (open_paren_cnt <= 0) {
                                 self.diagnostics.reportError(.{
                                     .error_type = LoxError.UnmatchedClosingParen,
@@ -200,19 +218,29 @@ pub fn compile(self: *Compiler, chunk: *Chunk) InterpretResult {
 
                             // close out the grouping
                             self.consumeGroup(&op_stack, chunk);
+
+                            // keep precedence order for ops
+                            // BUG: this can't live here
+                            self.consumeUnary(&op_stack, chunk);
+
                             self.advance();
                             continue :parse .start;
                         },
                         else => {
+                            Tracer.traceCompile(
+                                "[PARSER] .got_value else_binary  count: {d}  \n",
+                                .{op_stack.items.len},
+                            );
                             // Check if it's a binary operator
                             if (getBinaryOp(self.parser.previous.tag)) |binary_op| {
-                                // Handle binary operator with precedence
+                                // Handle previous binary operators with precedence
                                 self.consumeBinary(&op_stack, binary_op.precedence, chunk);
 
                                 // Push the new operator onto the stack
+                                Tracer.traceCompile("[PARSER] about to push operator to stack\n", .{});
                                 op_stack.append(self.gpa, binary_op) catch unreachable;
+                                Tracer.traceCompile("[PARSER] pushed operator to stack\n", .{}); // Now we expect a value again
 
-                                // Now we expect a value again
                                 parse_state = .expecting_value;
                                 self.advance();
                                 continue :parse .start;
@@ -251,9 +279,6 @@ pub fn compile(self: *Compiler, chunk: *Chunk) InterpretResult {
 
             // manage what parser is looking for
             parse_state = .got_value;
-
-            // keep precedence order for ops
-            self.consumeUnary(&op_stack, chunk);
 
             // Look ahead for binary operators
             Tracer.traceCompile("[PARSER] .primary_fall {t}\n", .{
@@ -323,6 +348,7 @@ pub fn compile(self: *Compiler, chunk: *Chunk) InterpretResult {
 }
 
 fn emitByte(self: *Compiler, chunk: *Chunk, byte: u8) void {
+    Tracer.traceCompile("[EMIT] byte={} opcode={any}\n", .{ byte, @as(OpCode, @enumFromInt(byte)) });
     chunk.writeChunk(byte, @intCast(self.parser.previous.src_loc.line));
 }
 fn emitBytes(self: *Compiler, chunk: *Chunk, byte1: u8, byte2: u8) void {
