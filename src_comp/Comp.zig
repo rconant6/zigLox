@@ -202,10 +202,10 @@ pub fn compile(self: *Compiler, chunk: *Chunk) InterpretResult {
                     switch (self.parser.previous.tag) {
                         .Eof => continue :parse .done,
                         .RightParen => {
-                            // Tracer.traceCompile(
-                            //     "[PARSER] .right_paren  count: {d}  \n",
-                            //     .{open_paren_cnt},
-                            // );
+                            Tracer.traceCompile(
+                                "[PARSER] .right_paren  count: {d}  \n",
+                                .{open_paren_cnt},
+                            );
                             if (open_paren_cnt <= 0) {
                                 self.diagnostics.reportError(.{
                                     .error_type = LoxError.UnmatchedClosingParen,

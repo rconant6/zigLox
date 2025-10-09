@@ -41,58 +41,26 @@ pub fn interpret(self: *VirtualMachine, src: []const u8) InterpretResult {
         // but this is a later thing when we add more than just calcualtor functions
         .Add => {
             trace("Binary OP: {s}\n", .{"+"});
-            const res = self.binaryOp(
-                Value,
-                isNumber,
-                struct {
-                    fn add(a: Value, b: Value) Value {
-                        return .{ .number = a.number + b.number };
-                    }
-                }.add,
-            );
+            const res = self.binaryOp(Value, isNumber, add);
             // TODO: String needs to be handled here too
             if (res != .Ok) return res;
             continue :vm readOp(chunk.code.items, &ip);
         },
         .Subtract => {
             trace("Binary OP: {s}\n", .{"-"});
-            const res = self.binaryOp(
-                Value,
-                isNumber,
-                struct {
-                    fn sub(a: Value, b: Value) Value {
-                        return .{ .number = a.number - b.number };
-                    }
-                }.sub,
-            );
+            const res = self.binaryOp(Value, isNumber, sub);
             if (res != .Ok) return res;
             continue :vm readOp(chunk.code.items, &ip);
         },
         .Multiply => {
             trace("Binary OP: {s}\n", .{"*"});
-            const res = self.binaryOp(
-                Value,
-                isNumber,
-                struct {
-                    fn sub(a: Value, b: Value) Value {
-                        return .{ .number = a.number * b.number };
-                    }
-                }.sub,
-            );
+            const res = self.binaryOp(Value, isNumber, mul);
             if (res != .Ok) return res;
             continue :vm readOp(chunk.code.items, &ip);
         },
         .Divide => {
             trace("Binary OP: {s}\n", .{"/"});
-            const res = self.binaryOp(
-                Value,
-                isNumber,
-                struct {
-                    fn sub(a: Value, b: Value) Value {
-                        return .{ .number = a.number / b.number };
-                    }
-                }.sub,
-            );
+            const res = self.binaryOp(Value, isNumber, div);
             if (res != .Ok) return res;
             continue :vm readOp(chunk.code.items, &ip);
         },
@@ -105,21 +73,17 @@ pub fn interpret(self: *VirtualMachine, src: []const u8) InterpretResult {
         .Negate => {
             trace("Negate OP:\n", .{});
             const val = self.pop();
-
             if (!isNumber(val))
                 return .Runtime_Error;
-
             self.push(.{ .number = -val.number });
             continue :vm readOp(chunk.code.items, &ip);
         },
         .Not => {
             trace("Not OP:\n", .{});
             const val = self.pop();
-
-            if (!isTruthy(val))
+            if (!isBool(val))
                 return .Runtime_Error;
-
-            self.push(val);
+            self.push(.{ .bool = !val.bool });
             continue :vm readOp(chunk.code.items, &ip);
         },
         .Return => {
@@ -178,86 +142,38 @@ pub fn interpret(self: *VirtualMachine, src: []const u8) InterpretResult {
         },
         .Greater => {
             trace("Greater OP:\n", .{});
-            const res = self.binaryOp(
-                Value,
-                isNumber,
-                struct {
-                    fn gt(a: Value, b: Value) Value {
-                        return if (a.number > b.number) .{ .bool = true } else .{ .bool = false };
-                    }
-                }.gt,
-            );
+            const res = self.binaryOp(Value, isNumber, greaterThan);
             if (res != .Ok) return res;
             continue :vm readOp(chunk.code.items, &ip);
         },
         .GreaterEqual => {
             trace("GreaterEqual OP:\n", .{});
 
-            const res = self.binaryOp(
-                Value,
-                isNumber,
-                struct {
-                    fn ge(a: Value, b: Value) Value {
-                        return if (a.number >= b.number) .{ .bool = true } else .{ .bool = false };
-                    }
-                }.ge,
-            );
+            const res = self.binaryOp(Value, isNumber, greaterThanEqual);
             if (res != .Ok) return res;
             continue :vm readOp(chunk.code.items, &ip);
         },
         .Less => {
             trace("Less OP:\n", .{});
-            const res = self.binaryOp(
-                Value,
-                isNumber,
-                struct {
-                    fn lt(a: Value, b: Value) Value {
-                        return if (a.number < b.number) .{ .bool = true } else .{ .bool = false };
-                    }
-                }.lt,
-            );
+            const res = self.binaryOp(Value, isNumber, lessThan);
             if (res != .Ok) return res;
             continue :vm readOp(chunk.code.items, &ip);
         },
         .LessEqual => {
             trace("LessEqual OP:\n", .{});
-            const res = self.binaryOp(
-                Value,
-                isNumber,
-                struct {
-                    fn le(a: Value, b: Value) Value {
-                        return if (a.number <= b.number) .{ .bool = true } else .{ .bool = false };
-                    }
-                }.le,
-            );
+            const res = self.binaryOp(Value, isNumber, lessThanEqual);
             if (res != .Ok) return res;
             continue :vm readOp(chunk.code.items, &ip);
         },
         .And => {
             trace("And OP:\n", .{});
-            const res = self.binaryOp(
-                Value,
-                isBool,
-                struct {
-                    fn la(a: Value, b: Value) Value {
-                        return .{ .bool = a.bool and b.bool };
-                    }
-                }.la,
-            );
+            const res = self.binaryOp(Value, isBool, logicalAnd);
             if (res != .Ok) return res;
             continue :vm readOp(chunk.code.items, &ip);
         },
         .Or => {
             trace("Or OP:\n", .{});
-            const res = self.binaryOp(
-                Value,
-                isBool,
-                struct {
-                    fn lo(a: Value, b: Value) Value {
-                        return .{ .bool = a.bool or b.bool };
-                    }
-                }.lo,
-            );
+            const res = self.binaryOp(Value, isBool, logicalOr);
             if (res != .Ok) return res;
             continue :vm readOp(chunk.code.items, &ip);
         },
@@ -304,7 +220,36 @@ fn binaryOp(
 
     return .Ok;
 }
-
+fn add(a: Value, b: Value) Value {
+    return .{ .number = a.number + b.number };
+}
+fn sub(a: Value, b: Value) Value {
+    return .{ .number = a.number - b.number };
+}
+fn mul(a: Value, b: Value) Value {
+    return .{ .number = a.number * b.number };
+}
+fn div(a: Value, b: Value) Value {
+    return .{ .number = a.number / b.number };
+}
+fn greaterThan(a: Value, b: Value) Value {
+    return if (a.number > b.number) .{ .bool = true } else .{ .bool = false };
+}
+fn greaterThanEqual(a: Value, b: Value) Value {
+    return if (a.number >= b.number) .{ .bool = true } else .{ .bool = false };
+}
+fn lessThan(a: Value, b: Value) Value {
+    return if (a.number < b.number) .{ .bool = true } else .{ .bool = false };
+}
+fn lessThanEqual(a: Value, b: Value) Value {
+    return if (a.number <= b.number) .{ .bool = true } else .{ .bool = false };
+}
+fn logicalAnd(a: Value, b: Value) Value {
+    return .{ .bool = a.bool and b.bool };
+}
+fn logicalOr(a: Value, b: Value) Value {
+    return .{ .bool = a.bool or b.bool };
+}
 // MARK: Memory management
 pub fn init(alloc: std.mem.Allocator) VirtualMachine {
     return .{
