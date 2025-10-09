@@ -10,7 +10,7 @@ pub const Scanner = @import("Scanner.zig");
 pub const Token = @import("Token.zig");
 pub const VirtualMachine = @import("VirtualMachine.zig");
 
-pub const Value = f64;
+// pub const Value = f64;
 
 pub const SourceLocation = struct {
     line: u32,
@@ -51,34 +51,48 @@ pub const InterpretResult = enum {
     Runtime_Error,
 };
 
-pub const ValueType = union(enum) {
+pub const Value = union(enum) {
     string: []const u8,
     number: f64,
     bool: bool,
-    void: void,
+    nil: void,
+
+    pub fn format(self: Value, w: *std.Io.Writer) !void {
+        try switch (self) {
+            .string => |s| w.print("{s}", .{s}),
+            .number => |n| w.print("{d}", .{n}),
+            .bool => |b| w.print("{any}", .{b}),
+            .nil => w.print("NIL", .{}),
+        };
+    }
 };
 
 pub const OpCode = enum(u8) {
     Add,
+    And,
     Constant,
     Divide,
-    Multiply,
-    Negate,
-    Not,
-    Return,
-    Subtract,
-    Nil,
-    True,
-    False,
     Equal,
-    NotEqual,
+    False,
     Greater,
     GreaterEqual,
+    Jump,
+    JumpIfFalse,
     Less,
     LessEqual,
+    Multiply,
+    Negate,
+    Nil,
+    Not,
+    NotEqual,
+    Or,
+    Return,
+    Subtract,
+    True,
 
     pub const SIMPLE_LEN = 1;
     pub const CONSTANT_LEN = 2;
+    pub const JUMP_LEN = 3;
 };
 
 pub const trace_utils = @import("trace.zig");

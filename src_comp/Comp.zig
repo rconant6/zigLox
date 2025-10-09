@@ -67,16 +67,18 @@ const OpStorage = struct {
 
 fn getBinaryOp(token_tag: Token.Tag) ?OpStorage {
     return switch (token_tag) {
-        .Plus => .{ .precedence = .term, .code = .Add },
-        .Minus => .{ .precedence = .term, .code = .Subtract },
-        .Star => .{ .precedence = .factor, .code = .Multiply },
-        .Slash => .{ .precedence = .factor, .code = .Divide },
-        .EqualEqual => .{ .precedence = .equality, .code = .Equal },
+        .And => .{ .precedence = .logic_and, .code = .And },
         .BangEqual => .{ .precedence = .equality, .code = .NotEqual },
+        .EqualEqual => .{ .precedence = .equality, .code = .Equal },
         .Greater => .{ .precedence = .comparision, .code = .Greater },
         .GreaterEqual => .{ .precedence = .comparision, .code = .GreaterEqual },
         .Less => .{ .precedence = .comparision, .code = .Less },
         .LessEqual => .{ .precedence = .comparision, .code = .LessEqual },
+        .Minus => .{ .precedence = .term, .code = .Subtract },
+        .Or => .{ .precedence = .logic_or, .code = .Or },
+        .Plus => .{ .precedence = .term, .code = .Add },
+        .Slash => .{ .precedence = .factor, .code = .Divide },
+        .Star => .{ .precedence = .factor, .code = .Multiply },
         else => null,
     };
 }
@@ -259,7 +261,7 @@ pub fn compile(self: *Compiler, chunk: *Chunk) InterpretResult {
                 .Number => {
                     Tracer.traceCompile("[PARSER] .number\n", .{});
                     const value = self.parser.previous.literalValue(self.src).number;
-                    self.emitConstant(chunk, value);
+                    self.emitConstant(chunk, .{ .number = value });
                 },
                 .True => {
                     Tracer.traceCompile("[PARSER] .true\n", .{});

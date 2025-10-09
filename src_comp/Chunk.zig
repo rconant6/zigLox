@@ -46,13 +46,29 @@ fn disassembleInstruction(self: *const Chunk, offset: usize) usize {
         .Constant => self.constantInstruction(instruction, offset),
         .Negate => self.simpleInstruction(instruction, offset),
         .Return => self.simpleInstruction(instruction, offset),
+        .And, .Or => self.simpleInstruction(instruction, offset),
         .Add, .Divide, .Multiply, .Subtract => self.simpleInstruction(instruction, offset),
         .True => self.simpleInstruction(instruction, offset),
         .False => self.simpleInstruction(instruction, offset),
         .Not => self.simpleInstruction(instruction, offset),
         .Nil => self.simpleInstruction(instruction, offset),
         .Equal, .NotEqual, .Greater, .GreaterEqual, .Less, .LessEqual => self.simpleInstruction(instruction, offset),
+        .Jump, .JumpIfFalse => self.jumpInstruction(instruction, offset),
     };
+}
+
+fn jumpInstruction(self: *const Chunk, op: OpCode, offset: usize) usize {
+    std.debug.assert(offset + 2 < self.code.items.len);
+
+    const jump_offset = (@as(u16, self.code.items[offset + 2]) << 8) |
+        @as(u16, self.code.items[offset + 1]);
+
+    std.debug.print(
+        "{t:<16} {d:4} -> {d:4}\n",
+        .{ op, offset, offset + 3 + jump_offset },
+    );
+
+    return offset + OpCode.JUMP_LEN;
 }
 fn constantInstruction(self: *const Chunk, op: OpCode, offset: usize) usize {
     std.debug.assert(offset + 1 < self.code.items.len);
@@ -60,7 +76,7 @@ fn constantInstruction(self: *const Chunk, op: OpCode, offset: usize) usize {
     const constant_idx = self.code.items[offset + 1];
 
     std.debug.print(
-        "{t:<16} {d:4} '{d}'\n",
+        "{t:<16} {d:4} '{any}'\n",
         .{ op, constant_idx, self.constants.items[constant_idx] },
     );
     return offset + OpCode.CONSTANT_LEN;

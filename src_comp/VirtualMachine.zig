@@ -34,42 +34,66 @@ pub fn interpret(self: *VirtualMachine, src: []const u8) InterpretResult {
     chunk.disassembleChunk("Interpret");
 
     vm: switch (readOp(chunk.code.items, &ip)) {
+        // TODO: Lets look at a better way to wrap this?
+        // I'm think we add states to the vm and start is what we have now
+        // then we can set the value jump to opCall or what ever and then if its Ok
+        // do the continue :start readOp(chunk.code.items, &ip)?
+        // but this is a later thing when we add more than just calcualtor functions
         .Add => {
             trace("Binary OP: {s}\n", .{"+"});
-            self.binaryOp(struct {
-                fn add(a: f64, b: f64) f64 {
-                    return a + b;
-                }
-            }.add);
-            // TODO: String needs to be handled here
-
+            const res = self.binaryOp(
+                Value,
+                isNumber,
+                struct {
+                    fn add(a: Value, b: Value) Value {
+                        return .{ .number = a.number + b.number };
+                    }
+                }.add,
+            );
+            // TODO: String needs to be handled here too
+            if (res != .Ok) return res;
             continue :vm readOp(chunk.code.items, &ip);
         },
         .Subtract => {
             trace("Binary OP: {s}\n", .{"-"});
-            self.binaryOp(struct {
-                fn sub(a: f64, b: f64) f64 {
-                    return a - b;
-                }
-            }.sub);
+            const res = self.binaryOp(
+                Value,
+                isNumber,
+                struct {
+                    fn sub(a: Value, b: Value) Value {
+                        return .{ .number = a.number - b.number };
+                    }
+                }.sub,
+            );
+            if (res != .Ok) return res;
             continue :vm readOp(chunk.code.items, &ip);
         },
         .Multiply => {
             trace("Binary OP: {s}\n", .{"*"});
-            self.binaryOp(struct {
-                fn mul(a: f64, b: f64) f64 {
-                    return a * b;
-                }
-            }.mul);
+            const res = self.binaryOp(
+                Value,
+                isNumber,
+                struct {
+                    fn sub(a: Value, b: Value) Value {
+                        return .{ .number = a.number * b.number };
+                    }
+                }.sub,
+            );
+            if (res != .Ok) return res;
             continue :vm readOp(chunk.code.items, &ip);
         },
         .Divide => {
             trace("Binary OP: {s}\n", .{"/"});
-            self.binaryOp(struct {
-                fn div(a: f64, b: f64) f64 {
-                    return a / b;
-                }
-            }.div);
+            const res = self.binaryOp(
+                Value,
+                isNumber,
+                struct {
+                    fn sub(a: Value, b: Value) Value {
+                        return .{ .number = a.number / b.number };
+                    }
+                }.sub,
+            );
+            if (res != .Ok) return res;
             continue :vm readOp(chunk.code.items, &ip);
         },
         .Constant => {
@@ -80,14 +104,22 @@ pub fn interpret(self: *VirtualMachine, src: []const u8) InterpretResult {
         },
         .Negate => {
             trace("Negate OP:\n", .{});
-            self.push(-self.pop());
+            const val = self.pop();
+
+            if (!isNumber(val))
+                return .Runtime_Error;
+
+            self.push(.{ .number = -val.number });
             continue :vm readOp(chunk.code.items, &ip);
         },
         .Not => {
             trace("Not OP:\n", .{});
             const val = self.pop();
-            const rep_val: f64 = if (val == 0.0 or std.math.isNan(val)) 1.0 else 0.0;
-            self.push(rep_val);
+
+            if (!isTruthy(val))
+                return .Runtime_Error;
+
+            self.push(val);
             continue :vm readOp(chunk.code.items, &ip);
         },
         .Return => {
@@ -96,72 +128,153 @@ pub fn interpret(self: *VirtualMachine, src: []const u8) InterpretResult {
         },
         .True => {
             trace("True:\n", .{});
-            self.push(@intFromBool(true));
+            self.push(.{ .bool = true });
             continue :vm readOp(chunk.code.items, &ip);
         },
         .False => {
             trace("False:\n", .{});
-            self.push(@intFromBool(false));
+            self.push(.{ .bool = false });
             continue :vm readOp(chunk.code.items, &ip);
         },
         .Nil => {
             trace("Nil:\n", .{});
-            self.push(std.math.nan(f64));
+            self.push(.{ .nil = {} });
             continue :vm readOp(chunk.code.items, &ip);
         },
         .Equal => {
             trace("Equal OP:\n", .{});
             const b = self.pop();
             const a = self.pop();
-            self.push(if (a == b) 1.0 else 0.0);
+
+            const equal = if (checkTypesMatch(a, b))
+                switch (a) {
+                    .number => a.number == b.number,
+                    .bool => a.bool == b.bool,
+                    .nil => true,
+                    .string => std.mem.eql(u8, a.string, b.string),
+                }
+            else
+                false;
+
+            self.push(.{ .bool = equal });
             continue :vm readOp(chunk.code.items, &ip);
         },
         .NotEqual => {
             trace("NotEqual OP:\n", .{});
             const b = self.pop();
             const a = self.pop();
-            self.push(if (a != b) 1.0 else 0.0);
+            const equal = if (checkTypesMatch(a, b))
+                switch (a) {
+                    .number => a.number != b.number,
+                    .bool => a.bool != b.bool,
+                    .nil => false,
+                    .string => !std.mem.eql(u8, a.string, b.string),
+                }
+            else
+                true;
+
+            self.push(.{ .bool = equal });
             continue :vm readOp(chunk.code.items, &ip);
         },
         .Greater => {
             trace("Greater OP:\n", .{});
-            self.binaryOp(struct {
-                fn gt(a: f64, b: f64) f64 {
-                    return if (a > b) 1.0 else 0.0;
-                }
-            }.gt);
+            const res = self.binaryOp(
+                Value,
+                isNumber,
+                struct {
+                    fn gt(a: Value, b: Value) Value {
+                        return if (a.number > b.number) .{ .bool = true } else .{ .bool = false };
+                    }
+                }.gt,
+            );
+            if (res != .Ok) return res;
             continue :vm readOp(chunk.code.items, &ip);
         },
         .GreaterEqual => {
             trace("GreaterEqual OP:\n", .{});
-            self.binaryOp(struct {
-                fn ge(a: f64, b: f64) f64 {
-                    return if (a >= b) 1.0 else 0.0;
-                }
-            }.ge);
+
+            const res = self.binaryOp(
+                Value,
+                isNumber,
+                struct {
+                    fn ge(a: Value, b: Value) Value {
+                        return if (a.number >= b.number) .{ .bool = true } else .{ .bool = false };
+                    }
+                }.ge,
+            );
+            if (res != .Ok) return res;
             continue :vm readOp(chunk.code.items, &ip);
         },
         .Less => {
             trace("Less OP:\n", .{});
-            self.binaryOp(struct {
-                fn lt(a: f64, b: f64) f64 {
-                    return if (a < b) 1.0 else 0.0;
-                }
-            }.lt);
+            const res = self.binaryOp(
+                Value,
+                isNumber,
+                struct {
+                    fn lt(a: Value, b: Value) Value {
+                        return if (a.number < b.number) .{ .bool = true } else .{ .bool = false };
+                    }
+                }.lt,
+            );
+            if (res != .Ok) return res;
             continue :vm readOp(chunk.code.items, &ip);
         },
         .LessEqual => {
             trace("LessEqual OP:\n", .{});
-            self.binaryOp(struct {
-                fn le(a: f64, b: f64) f64 {
-                    return if (a <= b) 1.0 else 0.0;
-                }
-            }.le);
+            const res = self.binaryOp(
+                Value,
+                isNumber,
+                struct {
+                    fn le(a: Value, b: Value) Value {
+                        return if (a.number <= b.number) .{ .bool = true } else .{ .bool = false };
+                    }
+                }.le,
+            );
+            if (res != .Ok) return res;
             continue :vm readOp(chunk.code.items, &ip);
+        },
+        .And => {
+            trace("And OP:\n", .{});
+            const res = self.binaryOp(
+                Value,
+                isBool,
+                struct {
+                    fn la(a: Value, b: Value) Value {
+                        return .{ .bool = a.bool and b.bool };
+                    }
+                }.la,
+            );
+            if (res != .Ok) return res;
+            continue :vm readOp(chunk.code.items, &ip);
+        },
+        .Or => {
+            trace("Or OP:\n", .{});
+            const res = self.binaryOp(
+                Value,
+                isBool,
+                struct {
+                    fn lo(a: Value, b: Value) Value {
+                        return .{ .bool = a.bool or b.bool };
+                    }
+                }.lo,
+            );
+            if (res != .Ok) return res;
+            continue :vm readOp(chunk.code.items, &ip);
+        },
+        .Jump => {
+            trace("Jump OP:\n", .{});
+            @panic("TODO: this isn't implemented yet");
+            // This needs to jump N bytes if falsey else continue
+        },
+        .JumpIfFalse => {
+            trace("Jump False OP:\n", .{});
+            @panic("TODO: this isn't implemented yet");
+            // This needs to do the jump to the write offset
         },
     }
     return .Ok;
 }
+// MARK: Execution Helpers
 inline fn readConstant(bytecode: []u8, ip: *usize, chunk: *const Chunk) Value {
     const val_idx = bytecode[ip.*];
     ip.* += 1;
@@ -172,12 +285,27 @@ inline fn readOp(bytecode: []u8, ip: *usize) OpCode {
     ip.* += 1;
     return result;
 }
-fn binaryOp(self: *VirtualMachine, comptime op: fn (Value, Value) f64) void {
+fn binaryOp(
+    self: *VirtualMachine,
+    comptime ResultType: type,
+    comptime typeCheck: fn (Value) bool,
+    comptime op: fn (Value, Value) ResultType,
+) InterpretResult {
     const b = self.pop();
     const a = self.pop();
+
+    if (!typeCheck(a) or !typeCheck(b)) {
+        // TODO: use diagnostics
+        std.log.err("Runtime Error: Type mismatch for binary operation", .{});
+        return .Runtime_Error;
+    }
+
     self.push(op(a, b));
+
+    return .Ok;
 }
 
+// MARK: Memory management
 pub fn init(alloc: std.mem.Allocator) VirtualMachine {
     return .{
         .gpa = alloc,
@@ -191,17 +319,37 @@ pub fn deinit(vm: *VirtualMachine) void {
     return;
 }
 
-fn push(vm: *VirtualMachine, val: f64) void {
-    Tracer.traceStack("VM.Push: {d}\n", .{val});
+// MARK: Stack management
+fn push(vm: *VirtualMachine, val: Value) void {
+    Tracer.traceStack("VM.Push: {f}\n", .{val});
     vm.stack.append(vm.gpa, val) catch |err| {
         std.log.err("Unable to VM.push: {any}\n", .{err});
         unreachable;
     };
 }
-fn pop(vm: *VirtualMachine) f64 {
+fn pop(vm: *VirtualMachine) Value {
     Tracer.traceStack("VM.Pop \n", .{});
     return if (vm.stack.pop()) |v| v else {
         std.log.err("VM.pop on an empty stack\n", .{});
         unreachable;
     };
+}
+
+// MARK: Runtime Type Checking
+fn isTruthy(val: Value) bool {
+    return switch (val) {
+        .bool => |b| b,
+        .nil => false,
+        else => true, // numbers, strings, objects are truthy
+    };
+}
+fn isNumber(val: Value) bool {
+    return std.meta.activeTag(val) == .number;
+}
+
+fn isBool(val: Value) bool {
+    return std.meta.activeTag(val) == .bool;
+}
+fn checkTypesMatch(a: Value, b: Value) bool {
+    return std.meta.activeTag(a) == std.meta.activeTag(b);
 }

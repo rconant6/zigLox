@@ -2,7 +2,7 @@ pub const Token = @This();
 
 const std = @import("std");
 const lox = @import("lox.zig");
-const LiteralValue = lox.ValueType;
+const LiteralValue = lox.Value;
 const Loc = lox.Location;
 const SrcLoc = lox.SourceLocation;
 
@@ -28,7 +28,7 @@ pub fn literalValue(self: Token, code: []const u8) LiteralValue {
         .Identifier => .{ .string = self.loc.slice(code) },
         .True => .{ .bool = true },
         .False => .{ .bool = false },
-        else => .{ .void = {} },
+        else => .{ .nil = {} },
     };
 }
 
