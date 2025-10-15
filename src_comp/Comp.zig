@@ -174,11 +174,13 @@ pub fn compile(self: *Compiler, chunk: *Chunk) InterpretResult {
 
     parse: switch (ParseState.start) {
         .start => {
-            Tracer.traceCompile("[PARSER] .start {t} (state: {t})\n", .{ self.parser.previous.tag, parse_state });
+            Tracer.traceCompile(
+                "[PARSER] .start {t} (state: {t})\n",
+                .{ self.parser.previous.tag, parse_state },
+            );
 
             switch (parse_state) {
                 .expecting_value => {
-                    // We need a value - handle value tokens
                     switch (self.parser.previous.tag) {
                         .Number, .True, .False, .Nil => continue :parse .primary,
                         .Bang => continue :parse .unary,

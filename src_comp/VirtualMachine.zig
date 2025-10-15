@@ -31,8 +31,6 @@ pub fn interpret(self: *VirtualMachine, src: []const u8) InterpretResult {
         return .Compile_Error;
     }
 
-    chunk.disassembleChunk("Interpret");
-
     vm: switch (readOp(chunk.code.items, &ip)) {
         // TODO: Lets look at a better way to wrap this?
         // I'm think we add states to the vm and start is what we have now
@@ -232,6 +230,12 @@ fn mul(a: Value, b: Value) Value {
 fn div(a: Value, b: Value) Value {
     return .{ .number = a.number / b.number };
 }
+fn logicalAnd(a: Value, b: Value) Value {
+    return .{ .bool = a.bool and b.bool };
+}
+fn logicalOr(a: Value, b: Value) Value {
+    return .{ .bool = a.bool or b.bool };
+}
 fn greaterThan(a: Value, b: Value) Value {
     return if (a.number > b.number) .{ .bool = true } else .{ .bool = false };
 }
@@ -243,12 +247,6 @@ fn lessThan(a: Value, b: Value) Value {
 }
 fn lessThanEqual(a: Value, b: Value) Value {
     return if (a.number <= b.number) .{ .bool = true } else .{ .bool = false };
-}
-fn logicalAnd(a: Value, b: Value) Value {
-    return .{ .bool = a.bool and b.bool };
-}
-fn logicalOr(a: Value, b: Value) Value {
-    return .{ .bool = a.bool or b.bool };
 }
 // MARK: Memory management
 pub fn init(alloc: std.mem.Allocator) VirtualMachine {
